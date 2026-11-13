@@ -1,0 +1,8 @@
+node_modules
+.tools
+dist
+package-lock.json
+family_manager_v1_plan.md
+data
+playwright-report
+test-results

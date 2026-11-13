@@ -1,0 +1,12 @@
+services:
+  family-manager:
+    build: .
+    ports:
+      - '127.0.0.1:3001:3001'
+    volumes:
+      - household-data:/app/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  household-data:
