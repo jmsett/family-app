@@ -38,6 +38,8 @@ Each milestone ends with working software, verification evidence and a concrete 
 
 ### Feedback needed
 
+**2026-11-17 UI direction:** Owner requested a minimal desktop interface and efficient use of space, especially on Android. Replaced the sidebar and promotional copy with compact top navigation and target summaries, kept the planning form prominent, and collapsed sync setup/backups while preserving a visible status. Browser mobile projects now use Pixel 7 emulation. Layout checks at 320, 360, 412, 768 and 1280 pixels show no horizontal overflow with long names and maximum amounts; primary controls remain at least 48 pixels tall. Actual Android installation and owner visual acceptance remain pending.
+
 - Is this calm overview useful, and does the plan versus recorded-money distinction make sense?
 - Is explicitly marking money as earmarked the right default for M2?
 - Should either member approve ordinary month-close/savings transfers, or should both approve? Any amount threshold?

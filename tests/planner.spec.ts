@@ -5,7 +5,7 @@ test('a couple can plan, save and reload without inventing recorded funds', asyn
 }, testInfo) => {
   await page.goto('/');
   await expect(
-    page.getByRole('heading', { name: 'Your monthly blueprint' }),
+    page.getByRole('heading', { name: 'Monthly targets' }),
   ).toBeVisible();
   await page
     .getByLabel('Planning month')
@@ -53,7 +53,7 @@ test('a couple can plan, save and reload without inventing recorded funds', asyn
   });
   await page.getByRole('button', { name: 'Monthly plan' }).click();
   await expect(
-    page.getByRole('heading', { name: 'A plan you can agree on.' }),
+    page.getByRole('heading', { name: 'Monthly plan' }),
   ).toBeVisible();
 });
 

@@ -149,77 +149,92 @@ export function SyncPanel({
   }
   return (
     <section className="panel sync-panel" aria-label="Device synchronization">
-      <h2>Device synchronization</h2>
-      <p role="status">{status}</p>
-      {!token ? (
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            setToken(tokenInput.trim());
-            setTokenInput('');
-          }}
-        >
-          <label>
-            GitHub token
-            <input
-              aria-label="GitHub token"
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              value={tokenInput}
-              onChange={(event) => setTokenInput(event.target.value)}
-              required
-            />
-          </label>
-          <button type="submit" disabled={!tokenInput.trim()}>
-            Connect family-data
-          </button>
-          <p>
-            Use a fine-grained token restricted to private family-data with
-            Contents read/write. It stays in memory until reload or disconnect.
-          </p>
-        </form>
-      ) : (
-        <div className="sync-actions">
+      <details>
+        <summary>
+          <span className="sync-title">Sync &amp; backups</span>
+          <span className="sync-status" role="status">
+            {status}
+          </span>
+          <span className="disclosure-icon" aria-hidden="true">
+            ⌄
+          </span>
+        </summary>
+        <div className="sync-content">
+          {!token ? (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                setToken(tokenInput.trim());
+                setTokenInput('');
+              }}
+            >
+              <label>
+                GitHub token
+                <input
+                  aria-label="GitHub token"
+                  type="password"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={tokenInput}
+                  onChange={(event) => setTokenInput(event.target.value)}
+                  required
+                />
+              </label>
+              <button type="submit" disabled={!tokenInput.trim()}>
+                Connect family-data
+              </button>
+              <p>
+                Use a fine-grained token restricted to private family-data with
+                Contents read/write. It stays in memory until reload or
+                disconnect.
+              </p>
+            </form>
+          ) : (
+            <div className="sync-actions">
+              <button
+                disabled={working || dirty}
+                onClick={() => void synchronize()}
+              >
+                Sync now
+              </button>
+              <button
+                disabled={working || dirty}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      'Replace this month’s saved device draft with GitHub? Pending local changes will be discarded. Export your device copy first if needed.',
+                    )
+                  )
+                    void synchronize(true);
+                }}
+              >
+                Recover from GitHub
+              </button>
+              <button
+                disabled={working}
+                onClick={() => {
+                  setToken('');
+                  setStatus('Disconnected. Device drafts are preserved.');
+                }}
+              >
+                Disconnect
+              </button>
+            </div>
+          )}
           <button
             disabled={working || dirty}
-            onClick={() => void synchronize()}
+            onClick={() => void exportDraft()}
           >
-            Sync now
+            Export saved month JSON
           </button>
-          <button
-            disabled={working || dirty}
-            onClick={() => {
-              if (
-                window.confirm(
-                  'Replace this month’s saved device draft with GitHub? Pending local changes will be discarded. Export your device copy first if needed.',
-                )
-              )
-                void synchronize(true);
-            }}
-          >
-            Recover from GitHub
-          </button>
-          <button
-            disabled={working}
-            onClick={() => {
-              setToken('');
-              setStatus('Disconnected. Device drafts are preserved.');
-            }}
-          >
-            Disconnect
-          </button>
+          {dirty && <p>Save your changes before synchronizing or exporting.</p>}
+          <small>
+            Sync runs while the app is open. Browser storage can be cleared;
+            pending changes are not backed up. Tokens grant access to all
+            records in family-data.
+          </small>
         </div>
-      )}
-      <button disabled={working || dirty} onClick={() => void exportDraft()}>
-        Export saved month JSON
-      </button>
-      {dirty && <p>Save your changes before synchronizing or exporting.</p>}
-      <small>
-        Sync runs while the app is open. Browser storage can be cleared; pending
-        changes are not backed up. Tokens grant access to all records in
-        family-data.
-      </small>
+      </details>
     </section>
   );
 }

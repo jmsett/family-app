@@ -96,12 +96,14 @@ test('two devices synchronize without overwriting divergent drafts and can recov
   }
   await page.getByLabel('Total allocation', { exact: true }).fill('1400');
   await page.getByRole('button', { name: 'Save draft' }).click();
+  await page.getByText('Sync & backups', { exact: true }).click();
   await page.getByLabel('GitHub token').fill('github_pat_fake_test_only');
   await page.getByRole('button', { name: 'Connect family-data' }).click();
   await expect(
     page.getByRole('status').filter({ hasText: 'Synced with' }),
   ).toBeVisible();
   expect(writes).toBe(1);
+  await second.getByText('Sync & backups', { exact: true }).click();
   await second.getByLabel('GitHub token').fill('github_pat_fake_test_only');
   await second.getByRole('button', { name: 'Connect family-data' }).click();
   await expect(
