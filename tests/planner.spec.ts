@@ -18,8 +18,8 @@ test('a couple can plan, save and reload without inventing recorded funds', asyn
   await expect(page.getByTestId('target-0')).toHaveText('€500.00');
   await expect(page.getByTestId('target-1')).toHaveText('€500.01');
   await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.getByRole('status')).toContainText(
-    'Draft saved on this computer',
+  await expect(page.locator('.message.success')).toContainText(
+    'Draft saved on this device',
   );
   await page.reload();
   // Month selection is intentionally not persisted in browser storage.
@@ -75,7 +75,7 @@ test('two windows cannot silently overwrite the same draft', async ({
   ).toHaveValue('1200.00');
   await page.getByLabel('Total allocation', { exact: true }).fill('1500');
   await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.getByRole('status')).toContainText('Draft saved');
+  await expect(page.locator('.message.success')).toContainText('Draft saved');
   await second.getByLabel('Total allocation', { exact: true }).fill('1800');
   await second.getByRole('button', { name: 'Save draft' }).click();
   await expect(second.getByRole('alert')).toContainText(

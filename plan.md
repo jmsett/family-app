@@ -25,6 +25,8 @@ The owner explicitly authorized beginning the architecture implementation while 
 
 ## Review gates
 
+Implementation slice: device draft storage and revisions, per-month GitHub adapter, visible sync status/recovery/export, build-generated PWA cache and manifest/icons, and Pages workflow are implemented. Live GitHub pairing and real phone installation remain pending owner setup. Synchronization currently processes the selected month; opening another month processes its pending draft. Export covers one saved month; JSON import/merge and SQLite migration are deferred.
+
 - A static production build works at `/family-app/` without an API server.
 - Saved proposals survive offline reload; invalid input and stale local writes are rejected.
 - Fresh devices can pull a draft; pending local changes survive errors and divergent remote changes; UTF-8 names round-trip correctly; tokens never appear in exports.

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { parseMoney, projectBudget } from '@family/domain';
 import type { BudgetDraft, Workspace } from '@family/shared';
+import { readRecord, saveDraft, workspace as deviceWorkspace } from './storage';
+import { SyncPanel } from './SyncPanel';
 import './style.css';
 
 const money = (minor: number) =>
@@ -21,16 +23,6 @@ const currentMonth = new Intl.DateTimeFormat('sv-SE', {
   month: '2-digit',
 }).format(new Date());
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(path, options);
-  const data = await response.json();
-  if (!response.ok)
-    throw new Error(
-      data.message ?? 'The server could not complete this request.',
-    );
-  return data as T;
-}
-
 function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [draft, setDraft] = useState<BudgetDraft | null>(null);
@@ -41,6 +33,8 @@ function App() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   function accept(data: Workspace) {
     setWorkspace(data);
@@ -49,21 +43,23 @@ function App() {
     setSavings(amountInput(data.draft.savingsMinor));
   }
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
     setBusy(true);
     setError('');
     setNotice('');
-    request<Workspace>(`/api/workspace?month=${encodeURIComponent(month)}`, {
-      signal: controller.signal,
-    })
-      .then(accept)
+    readRecord(month)
+      .then((data) => {
+        if (!cancelled) accept(deviceWorkspace(data));
+      })
       .catch((err: Error) => {
-        if (err.name !== 'AbortError') setError(err.message);
+        if (!cancelled) setError(err.message);
       })
       .finally(() => {
-        if (!controller.signal.aborted) setBusy(false);
+        if (!cancelled) setBusy(false);
       });
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+    };
   }, [month]);
 
   let candidate: BudgetDraft | null = null;
@@ -102,15 +98,10 @@ function App() {
     setError('');
     setNotice('');
     try {
-      accept(
-        await request<Workspace>('/api/budget-draft', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(candidate),
-        }),
-      );
+      accept(await saveDraft(candidate));
+      setRefreshKey((key) => key + 1);
       setNotice(
-        'Draft saved on this computer. No money has been recorded or moved.',
+        'Draft saved on this device. No money has been recorded or moved.',
       );
     } catch (err) {
       setError((err as Error).message);
@@ -122,7 +113,11 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="/" aria-label="Family Manager home">
+        <a
+          className="brand"
+          href={import.meta.env.BASE_URL}
+          aria-label="Family Manager home"
+        >
           <span className="brand-mark">
             fm<span>✳</span>
           </span>
@@ -157,8 +152,10 @@ function App() {
           </button>
         </nav>
         <div className="sidebar-note">
-          <span className="status-dot" /> LOCAL PROTOTYPE
-          <p>Your plan stays on this computer. Account access comes next.</p>
+          <span className="status-dot" /> INSTALLABLE PWA
+          <p>
+            Save on your device. Connect your private repository to share plans.
+          </p>
           <small>Foundation · milestone 0</small>
         </div>
       </aside>
@@ -171,7 +168,7 @@ function App() {
             </span>
           </span>
           <span className="local-badge">
-            <span className="status-dot" /> Local only
+            <span className="status-dot" /> Device storage
           </span>
         </header>
         <section className="page-heading">
@@ -196,7 +193,7 @@ function App() {
               min="2000-01"
               max="2100-12"
               value={month}
-              disabled={busy}
+              disabled={busy || syncBusy}
               onChange={(e) => {
                 if (
                   e.target.value &&
@@ -236,6 +233,15 @@ function App() {
             {notice}
           </div>
         )}
+        <SyncPanel
+          month={month}
+          dirty={dirty || busy}
+          refreshKey={refreshKey}
+          onBusy={setSyncBusy}
+          onRefresh={async () =>
+            accept(deviceWorkspace(await readRecord(month)))
+          }
+        />
         {!workspace || !draft ? (
           <section className="panel empty-state" aria-busy={busy}>
             <h2>
@@ -243,8 +249,8 @@ function App() {
             </h2>
             <p>
               {busy
-                ? 'Connecting to the local household database.'
-                : 'Check that the API is running, then reload the page.'}
+                ? 'Opening device storage.'
+                : 'Allow browser storage, then reload the page.'}
             </p>
           </section>
         ) : (
@@ -322,7 +328,7 @@ function App() {
                   <span className="step-label">01 / Set targets</span>
                 </div>
                 <form onSubmit={(event) => void save(event)}>
-                  <fieldset disabled={busy}>
+                  <fieldset disabled={busy || syncBusy}>
                     <legend className="sr-only">Monthly budget draft</legend>
                     <div className="input-row">
                       <label>
@@ -505,8 +511,8 @@ function App() {
                   <h2>First, a shared foundation.</h2>
                   <p>
                     Try a month, adjust your split, and save a plan. Your
-                    feedback shapes the next milestone: private household
-                    access.
+                    feedback shapes the next milestone: the virtual fund and
+                    ledger.
                   </p>
                 </section>
               </div>
@@ -530,3 +536,19 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>,
 );
+
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`, {
+        scope: import.meta.env.BASE_URL,
+      })
+      .catch(() => {
+        const message = document.createElement('p');
+        message.setAttribute('role', 'alert');
+        message.textContent =
+          'Offline app installation failed. Reopen online to retry; device drafts are preserved.';
+        document.getElementById('root')?.prepend(message);
+      });
+  });
+}

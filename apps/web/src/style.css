@@ -1025,3 +1025,32 @@ footer {
     background: #173f2d;
   }
 }
+
+.sync-panel {
+  margin-bottom: 24px;
+  padding: 24px;
+}
+.sync-panel input {
+  display: block;
+  width: min(100%, 32rem);
+  margin: 8px 0 12px;
+}
+.sync-panel p,
+.sync-panel small {
+  overflow-wrap: anywhere;
+}
+.sync-panel button {
+  margin: 8px 12px 8px 0;
+  padding: 10px 14px;
+  border: 1px solid #b8c8bd;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.sync-panel small {
+  display: block;
+  color: #53645c;
+}
+.sync-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

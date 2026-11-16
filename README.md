@@ -1,36 +1,63 @@
 # Family Manager
 
-A household finance PWA for two adults. Plan a shared monthly budget, distinguish contributions from money actually earmarked, and eventually track expenses, reimbursements, savings goals and subscriptions. No bank connection is required. Money uses integer cents; targets never imply available cash.
+A household finance PWA for two adults. Plan a monthly budget, distinguish contribution targets from money actually earmarked, and eventually track expenses, reimbursements, savings goals and subscriptions. No bank connection is required. Money uses integer cents; targets never imply available cash.
 
-## Architecture decision (2026-11-17)
+**Current implementation:** monthly planning with offline device storage, an installable app shell and private GitHub synchronization. Financial entries and the ledger are future milestones. The GitHub adapter is tested with a mocked API; live repository pairing and phone installation still need the owner setup below.
 
-Follow the existing `nunz-app` approach: publish the installable app from the public **family-app** repository on GitHub Pages, and synchronize JSON to the private **family-data** repository using device-specific fine-grained GitHub tokens. Devices save locally and synchronize while open and connected. Production requires no application server or VPN. See [plan.md](plan.md) for the implementation sequence and conflict/security rules.
+## Architecture
 
-Create both repositories now; initialize `family-data` with a README on `main`. After the implementation push, enable Pages with **GitHub Actions** in `family-app` and publish this source there. Each device will need an expiring fine-grained token restricted to `family-data` with **Contents: Read and write**. Enter it only in the app, never in this repository, Actions secrets/build variables, or chat. Initial tokens are kept in memory and must be entered again after reload. The private repository is not end-to-end encrypted.
+Following the existing `nunz-app` approach:
 
-The instructions below describe the existing M0 server prototype until the architecture implementation lands. Existing SQLite drafts remain local; migration is a separate step.
+- **family-app (public):** React/TypeScript source and static PWA hosted on GitHub Pages. No household records or credentials in source or deployment artifacts.
+- **family-data (private):** JSON drafts at `budgets/YYYY-MM.json`, synchronized through GitHub's Contents API. No production API server, SQLite database or VPN is needed.
+- **Devices:** IndexedDB saves work offline. Each device uses a separate expiring fine-grained token scoped only to `family-data` with Contents read/write. Enter it only in the PWA; it stays in memory until reload/disconnect. Tokens are never exported or synchronized.
+- **Conflicts:** different months synchronize independently. Divergent changes to one month stop with a visible conflict; export the local JSON before explicitly recovering the GitHub copy. No automatic last-write-wins for monetary edits.
 
-**Current review: M0 — foundation and monthly planning prototype.** React/TypeScript, Fastify and SQLite run locally. Save a monthly draft, adjust savings and contribution shares, and reload it. Authentication, real financial entries and offline sync come in later milestones. Use sample data for this local prototype.
+See [plan.md](plan.md), [architecture](docs/architecture.md) and [milestone.md](milestone.md). The owner authorized this architecture slice; other financial milestones still require review.
 
 ## Run locally
 
-Dependencies stay in this checkout (`node_modules`); no Python virtual environment is needed. On Linux x64, the npm wrapper below uses the project-local Node.js 24 runtime, downloading and verifying it if missing. It sets PATH automatically for the command, so no system installation or shell configuration is needed.
+Dependencies stay in this checkout (`node_modules`). The wrapper uses a project-local Node.js 24 runtime on Linux x64, downloading and verifying it if missing. On other platforms, install Node.js 24 and use npm directly.
 
 ```bash
 bash scripts/npm.sh ci
-bash scripts/npm.sh run dev
+bash scripts/npm.sh run dev:web
 ```
 
-Open **http://localhost:5173**. API: `http://localhost:3001/api/health`. Drafts and their revision history persist in `data/family-manager.sqlite`. Both servers bind to loopback; this milestone has no login. Stop with Ctrl+C. For a single server: `bash scripts/npm.sh run build && bash scripts/npm.sh start`, then open **http://localhost:3001**. On other platforms, install Node.js 24 and use npm directly.
+Open **http://localhost:5173**. The app uses device storage and works without Fastify. The service worker is enabled only in a production build. To test the Pages path and installation locally:
 
 ```bash
-bash scripts/npm.sh run check # types, lint, unit/integration tests, build, format
-bash scripts/npm.sh exec -- playwright install chromium
-bash scripts/npm.sh run test:e2e # desktop + mobile browser tests
-# Or use an installed Chrome:
-PLAYWRIGHT_CHROME_PATH=/usr/bin/google-chrome bash scripts/npm.sh run test:e2e
+VITE_BASE_PATH=/family-app/ bash scripts/npm.sh run build
+VITE_BASE_PATH=/family-app/ bash scripts/npm.sh exec -- vite preview --config apps/web/vite.config.ts --host localhost --port 4173
 ```
 
-Optional Docker: `docker compose up --build`, then open `http://localhost:3001`. SQLite persists in a named volume. Docker configuration is provided but has not been run in this development environment.
+Open **http://localhost:4173/family-app/** online once, then test offline reload. The service worker caches only built app assets; authenticated GitHub responses are never cached there. Updates activate after existing app windows close.
 
-See [milestone.md](milestone.md) for review gates and the M0 walkthrough, and [architecture](docs/architecture.md) for contracts and decisions. Every milestone needs your explicit feedback before the next begins.
+```bash
+bash scripts/npm.sh run check # types, lint, unit/API/sync tests, build, formatting
+bash scripts/npm.sh exec -- playwright install chromium
+bash scripts/npm.sh run test:e2e # desktop + mobile planner regression
+bash scripts/npm.sh run test:pwa # static subpath, offline shell, mocked multi-device sync
+# To use installed Chrome, prefix either browser test command with:
+# PLAYWRIGHT_CHROME_PATH=/usr/bin/google-chrome
+```
+
+## GitHub setup — ready to begin
+
+1. Create **family-app** (public) and **family-data** (private). Initialize `family-data` with a README on `main`. GitHub reported during the documentation push that `jmsett/family_manager` has already moved to `jmsett/family-app`.
+2. In `family-app`, set **Settings → Pages → Build and deployment → Source → GitHub Actions**. The included Pages workflow builds the static app with the repository path and deploys only `apps/web/dist`. No data token or Actions secret is needed.
+3. Open **https://jmsett.github.io/family-app/** once deployment succeeds. Install through the browser's app installation menu; on iPhone use Safari → Share → Add to Home Screen.
+4. Create a separate fine-grained token for each device: resource owner **jmsett**, repository access **Only select repositories → family-data**, repository permission **Contents: Read and write**, with an expiration. GitHub includes Metadata read access. Do not grant access to `family-app` or other repositories.
+5. On the first device, save a monthly proposal, enter the token in **Device synchronization**, and connect. The app verifies the repository is private and creates the monthly JSON. An untouched sample proposal is never uploaded automatically.
+6. On the second device, connect before editing that month. It downloads the existing proposal. Edit, save, and check both devices using **Sync now**. A token must be entered again after reload. Sync processes the selected month; select other months to synchronize those drafts.
+7. Perform an offline/concurrent edit drill with sample data. Both local edits must survive a conflict. Export the losing device's JSON before choosing **Recover from GitHub**, which replaces that month's saved device draft after confirmation.
+
+Synchronization runs after saves, on reconnect/focus/visibility changes, every two minutes while visible, and on request. It runs only while the app is open. Save form changes before syncing. Failures preserve saved local drafts; unsaved fields still require Save. Browser storage can be evicted or cleared, so pending changes are not backed up. Export each needed month for an independent backup; Git history alone is not a backup policy. JSON import/merging and automatic migration from SQLite are not implemented yet.
+
+Private JSON is not end-to-end encrypted. GitHub and collaborators can read it; tokens grant repository-wide access, with no separate per-member authorization. Local records remain after disconnect. Same-origin scripts can access those records and active credentials, and project Pages sites on `jmsett.github.io` share an origin. Revoke a lost device's token in GitHub. Never paste tokens into chat, commit them, or put them in build variables.
+
+Official references: [GitHub Contents API](https://docs.github.com/en/rest/repos/contents), [fine-grained tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages), [PWA installation](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
+
+## Legacy local API
+
+`bash scripts/npm.sh run dev` still starts both the web app and the legacy Fastify API at `localhost:3001`. The browser no longer calls that API. Existing SQLite data at ignored `data/family-manager.sqlite` is preserved and is not automatically copied to device storage or GitHub. The legacy API, integration tests and Docker setup remain available for reference; they do not describe the Pages production deployment.

@@ -11,7 +11,7 @@ export interface BudgetProjection {
   memberTargetsMinor: [number, number];
 }
 export interface Workspace {
-  mode: 'local-prototype';
+  mode: 'local-prototype' | 'device-pwa';
   currency: 'EUR';
   timezone: 'Europe/Busingen';
   draft: BudgetDraft;

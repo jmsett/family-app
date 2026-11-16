@@ -4,6 +4,16 @@
 
 The owner selected the existing `nunz-app` deployment pattern: public `family-app` on Pages, local IndexedDB and private `family-data` JSON synchronized through repository-scoped fine-grained tokens. [plan.md](../plan.md) is the current architecture and implementation sequence. This supersedes the production storage/authentication/hosting/backup choices in ADRs 002–005 below; those sections document the legacy local API prototype. Financial domain invariants in ADR 001 still apply. GitHub repository access replaces application sessions; repository collaborators can read all JSON, so per-member private records require a separate future design.
 
+## ADR 007: Implemented device and GitHub draft contract
+
+The static app uses IndexedDB database `family-manager-v1`, object store `budgets`, keyed by month. Each entry includes the current draft, last remote baseline, remote blob SHA and pending flag. Local compare-and-write uses one read/write transaction, preventing stale tab saves. Local revisions invalidate forms after remote replacement. A synchronization failure never clears pending changes.
+
+Remote path: `budgets/YYYY-MM.json` on `main`; envelope `{ schemaVersion: 1, draft: BudgetDraft }`. The client validates the schema, selected month, integer amounts and names before applying records. Each cycle checks repository privacy. Updates recheck privacy and include GitHub's current SHA; divergent changes against the baseline require manual review. Matching local/remote content acknowledges a retry after a lost response. Deletion of a previously synchronized file is an explicit error.
+
+Tokens live in component memory, with nonpersistent password entry. No application login/passkeys or per-member data access controls are implemented. Repository scope grants access to all records; optional persisted credentials and finer access boundaries need separate review. GitHub API responses bypass the service worker; only build-generated static assets enter its cache. Cache versions depend on build content, and scope-specific prefixes avoid deleting other applications' shell caches. IndexedDB remains shared by same-origin pages.
+
+The API contract and decisions below describe the legacy server prototype. It remains available for development; the browser uses this device contract in production.
+
 ## ADR 001: Virtual funds and money
 
 Accepted for M0 implementation, subject to owner review. One household currency (EUR), two proposed contributors, Europe/Busingen timezone. Targets, commitments, self-reported earmarking, actual expenses, payables and forecasts are separate concepts. M0 implements **targets only**; recorded totals are explicitly zero, since no financial-entry capability exists yet. Never infer bank balances. General savings is included in the total allocation. Default categories: Groceries, Home & bills, Transport, Health, Leisure, Other.
