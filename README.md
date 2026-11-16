@@ -1,6 +1,14 @@
 # Family Manager
 
-A private, self-hosted household finance app for two adults. Plan a shared monthly budget, distinguish contributions from money actually earmarked, and eventually track expenses, reimbursements, savings goals and subscriptions. No bank connection is required. Money uses integer cents; targets never imply available cash.
+A household finance PWA for two adults. Plan a shared monthly budget, distinguish contributions from money actually earmarked, and eventually track expenses, reimbursements, savings goals and subscriptions. No bank connection is required. Money uses integer cents; targets never imply available cash.
+
+## Architecture decision (2026-11-17)
+
+Follow the existing `nunz-app` approach: publish the installable app from the public **family-app** repository on GitHub Pages, and synchronize JSON to the private **family-data** repository using device-specific fine-grained GitHub tokens. Devices save locally and synchronize while open and connected. Production requires no application server or VPN. See [plan.md](plan.md) for the implementation sequence and conflict/security rules.
+
+Create both repositories now; initialize `family-data` with a README on `main`. After the implementation push, enable Pages with **GitHub Actions** in `family-app` and publish this source there. Each device will need an expiring fine-grained token restricted to `family-data` with **Contents: Read and write**. Enter it only in the app, never in this repository, Actions secrets/build variables, or chat. Initial tokens are kept in memory and must be entered again after reload. The private repository is not end-to-end encrypted.
+
+The instructions below describe the existing M0 server prototype until the architecture implementation lands. Existing SQLite drafts remain local; migration is a separate step.
 
 **Current review: M0 — foundation and monthly planning prototype.** React/TypeScript, Fastify and SQLite run locally. Save a monthly draft, adjust savings and contribution shares, and reload it. Authentication, real financial entries and offline sync come in later milestones. Use sample data for this local prototype.
 

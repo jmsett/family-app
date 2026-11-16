@@ -1,5 +1,7 @@
 # Milestones and owner review gates
 
+**2026-11-17 owner direction:** Implement the public Pages PWA / private GitHub JSON architecture now, using `nunz-app` as reference. This explicitly authorizes the architecture slice spanning the former M1/M7/M8 boundaries while M0 feedback stays pending. See [plan.md](plan.md); legacy VPN/passkey/server requirements below are superseded for production. Other financial milestones still require owner review.
+
 Each milestone ends with working software, verification evidence and a concrete review walkthrough. **Only the owner can accept a milestone.** Passing tests is not approval. Record their genuine feedback here, resolve requested changes, and get explicit acceptance before beginning the next milestone. Do not infer approval from silence.
 
 ## M0 — Foundation and monthly planning

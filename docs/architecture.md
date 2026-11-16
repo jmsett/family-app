@@ -1,5 +1,9 @@
 # Foundation decisions and API contract
 
+## ADR 006: Public PWA and private GitHub JSON (accepted 2026-11-17)
+
+The owner selected the existing `nunz-app` deployment pattern: public `family-app` on Pages, local IndexedDB and private `family-data` JSON synchronized through repository-scoped fine-grained tokens. [plan.md](../plan.md) is the current architecture and implementation sequence. This supersedes the production storage/authentication/hosting/backup choices in ADRs 002–005 below; those sections document the legacy local API prototype. Financial domain invariants in ADR 001 still apply. GitHub repository access replaces application sessions; repository collaborators can read all JSON, so per-member private records require a separate future design.
+
 ## ADR 001: Virtual funds and money
 
 Accepted for M0 implementation, subject to owner review. One household currency (EUR), two proposed contributors, Europe/Busingen timezone. Targets, commitments, self-reported earmarking, actual expenses, payables and forecasts are separate concepts. M0 implements **targets only**; recorded totals are explicitly zero, since no financial-entry capability exists yet. Never infer bank balances. General savings is included in the total allocation. Default categories: Groceries, Home & bills, Transport, Health, Leisure, Other.
