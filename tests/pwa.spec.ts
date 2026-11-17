@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { confirm, connect, navigate, setSavings } from './helpers';
 
 test('branch-published PWA keeps plans and confirmed funds offline', async ({
@@ -77,6 +78,9 @@ test('devices synchronize plans, recover conflicts and merge independent offline
           return route.fulfill({ status: 404, json: {}, headers });
         if (request.method() === 'PUT') {
           const body = request.postDataJSON();
+          expect(
+            Buffer.from(body.content, 'base64').toString('utf8'),
+          ).not.toContain('github_pat_fake_test_only');
           if ((remote?.sha ?? undefined) !== body.sha)
             return route.fulfill({ status: 409, json: {}, headers });
           writes++;
@@ -101,9 +105,23 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await connect(page);
   await expect(status(page)).toContainText('Synced with');
   expect(writes).toBe(1);
+  await page.reload();
+  await navigate(page, 'Settings');
+  await page.getByText('Sync & backups', { exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Sync now' })).toBeVisible();
+  await expect(page.getByLabel('GitHub token')).toHaveCount(0);
+  await expect(status(page)).toContainText('Synced with');
+  expect(writes).toBe(1);
+
   await connect(second);
   await expect(status(second)).toContainText('Synced with');
   await second.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await expect(second.getByLabel('GitHub token')).toBeVisible();
+  await second.reload();
+  await navigate(second, 'Settings');
+  await second.getByText('Sync & backups', { exact: true }).click();
+  await expect(second.getByLabel('GitHub token')).toBeVisible();
+
   await setSavings(second, '300');
   await setSavings(page, '250');
   await navigate(page, 'Settings');
@@ -114,7 +132,11 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   expect(writes).toBe(2);
   const download = second.waitForEvent('download');
   await second.getByRole('button', { name: 'Export household JSON' }).click();
-  expect((await download).suggestedFilename()).toBe('family-household.json');
+  const backup = await download;
+  expect(backup.suggestedFilename()).toBe('family-household.json');
+  expect(await readFile((await backup.path())!, 'utf8')).not.toContain(
+    'github_pat_fake_test_only',
+  );
   second.once('dialog', (dialog) => dialog.accept());
   await second.getByRole('button', { name: 'Recover from GitHub' }).click();
   await expect(status(second)).toContainText('Synced with');
@@ -145,4 +167,29 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await expect(second.getByTestId('savings-funds')).toHaveText('€250.00');
   expect(writes).toBe(4);
   await secondContext.close();
+});
+
+test('invalid tokens are not remembered after reopening the app', async ({
+  page,
+}) => {
+  await page.route(
+    /^https:\/\/api\.github\.com\/repos\/jmsett\/family-data(?:\/.*)?$/,
+    (route) =>
+      route.fulfill({
+        status: 401,
+        json: {},
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      }),
+  );
+  await page.goto('./');
+  await connect(page);
+  const status = page
+    .getByRole('region', { name: 'Device synchronization' })
+    .getByRole('status');
+  await expect(status).toContainText('invalid or expired');
+  await page.reload();
+  await navigate(page, 'Settings');
+  await page.getByText('Sync & backups', { exact: true }).click();
+  await expect(page.getByLabel('GitHub token')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sync now' })).toHaveCount(0);
 });

@@ -2,6 +2,10 @@
 
 **2026-11-17 owner direction:** Implement the public Pages PWA / private GitHub JSON architecture now, using `nunz-app` as reference. This explicitly authorizes the architecture slice spanning the former M1/M7/M8 boundaries while M0 feedback stays pending. See [plan.md](plan.md); legacy VPN/passkey/server requirements below are superseded for production. Other financial milestones still require owner review.
 
+## Remembered GitHub connection — current update
+
+Owner requested parity with Nunz: validate private-repository access, then remember the token in a separate device-only IndexedDB store and reconnect on app reopen. Disconnect removes the stored token without deleting household records; other open app tabs are notified. Credentials never enter exported or synchronized JSON. Browser tests cover reload/reconnect, disconnect/reload, rejected tokens and credential exclusion from backups/uploads.
+
 ## Recurring planning and trust confirmations — current review slice
 
 **Status: implemented; owner review pending.** The owner requested separate Overview/Monthly plan screens, operating budgets derived from recurring expenses, fixed savings and 50/50 contributions. This explicitly authorizes the relevant planning, recurring and confirmation work across earlier milestone boundaries.
@@ -18,7 +22,7 @@
 
 - Browser monthly drafts use IndexedDB with atomic revision checks; the production browser no longer requires the API.
 - Manifest, PNG icons, scoped build-versioned shell cache and a committed root build for Pages branch deployment are included.
-- A memory-only token connects to private `jmsett/family-data`, with per-month schema validation, SHA write protection, pending/error/conflict status, JSON export and confirmed remote recovery.
+- The original memory-only token connects to private `jmsett/family-data`, with per-month schema validation, SHA write protection, pending/error/conflict status, JSON export and confirmed remote recovery.
 - Sync is limited to the selected monthly proposal while the app is open. This is not the future financial ledger sync implementation.
 - Follow README GitHub setup, test installation on both phones, edit offline and verify conflicts before using household data. No live tokens or private records were used in development.
 

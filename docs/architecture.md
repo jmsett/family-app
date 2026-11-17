@@ -1,5 +1,11 @@
 # Foundation decisions and API contract
 
+## ADR 010: Remember device connections as Nunz does
+
+Owner feedback requests the connection behavior already used by `nunz-app`. After validating private-repository access, store the token in database `family-github-device-v1`, store `secrets`, key `github-token`. This database is separate from household data and excluded from all sync documents, exports and public assets. Restore it on app start, allowing automatic foreground synchronization without re-entry. Disconnect deletes the saved token and preserves household records. Other open app tabs receive a credential-change notification without broadcasting the token itself.
+
+This is browser storage, not an encrypted OS credential vault; same-origin scripts can access it. Expiration, revocation or clearing browser data requires reconnecting. Invalid tokens are not persisted. Existing household data/schema is unchanged.
+
 ## ADR 009: Recurring planning and trusted transfer confirmations
 
 Owner feedback replaces the editable total allocation and configurable split with derived monthly operating costs, fixed savings and a 50/50 split. Recurring schedules store first due date, optional inclusive end date, archive effective month, category and labels. Savings targets carry effective-month history. Overview contains confirmed funds, while all target definition lives in Monthly plan.
@@ -20,7 +26,7 @@ The static app uses IndexedDB database `family-manager-v1`, object store `budget
 
 Remote path: `budgets/YYYY-MM.json` on `main`; envelope `{ schemaVersion: 1, draft: BudgetDraft }`. The client validates the schema, selected month, integer amounts and names before applying records. Each cycle checks repository privacy. Updates recheck privacy and include GitHub's current SHA; divergent changes against the baseline require manual review. Matching local/remote content acknowledges a retry after a lost response. Deletion of a previously synchronized file is an explicit error.
 
-Tokens live in component memory, with nonpersistent password entry. No application login/passkeys or per-member data access controls are implemented. Repository scope grants access to all records; optional persisted credentials and finer access boundaries need separate review. GitHub API responses bypass the service worker; only build-generated static assets enter its cache. Cache versions depend on build content, and scope-specific prefixes avoid deleting other applications' shell caches. IndexedDB remains shared by same-origin pages.
+Initially tokens lived only in component memory; ADR 010 supersedes that choice. No application login/passkeys or per-member data access controls are implemented. Repository scope grants access to all records; finer access boundaries need separate review. GitHub API responses bypass the service worker; only build-generated static assets enter its cache. Cache versions depend on build content, and scope-specific prefixes avoid deleting other applications' shell caches. IndexedDB remains shared by same-origin pages.
 
 The API contract and decisions below describe the legacy server prototype. It remains available for development; the browser uses this device contract in production.
 
