@@ -14,18 +14,20 @@ Accepted by the owner: follow the architecture already used in `nunz-app`.
 
 This supersedes the VPN/Fastify/SQLite/passkey production topology in the original local specification `family_manager_v1_plan.md` and ADRs 002–005. The legacy API remains a development reference; existing SQLite drafts are not automatically migrated or deleted.
 
+The owner confirmed branch deployment matching `nunz-app`: use **main / (root)**. Run `npm run build:pages` and commit generated static files with source changes; `.nojekyll` disables Jekyll processing. CI checks artifact freshness. This supersedes the initial custom Actions deployment choice.
+
 ## Implementation sequence
 
 1. Publish this architecture decision and README update to the current `family_manager` remote.
-2. Implement static browser persistence, a PWA manifest/icons and versioned shell cache, GitHub synchronization with visible pending/error/conflict status, JSON export and explicit remote recovery, and a Pages deployment workflow. Verify and push this implementation separately.
-3. Owner creates `family-app` (public) and `family-data` (private, initialize with a README/main branch). Configure Pages to use GitHub Actions, publish the source to `family-app`, then pair two devices using separate tokens. Verify actual private API access, installation, offline relaunch, and concurrent editing on the deployed origin.
+2. Implement static browser persistence, a PWA manifest/icons and versioned shell cache, GitHub synchronization with visible pending/error/conflict status, JSON export and explicit remote recovery, and a branch-published Pages build. Verify and push this implementation separately.
+3. Owner creates `family-app` (public) and `family-data` (private, initialize with a README/main branch). Configure Pages to deploy from `main` / `(root)`, publish the source and root static build to `family-app`, then pair two devices using separate tokens. Verify actual private API access, installation, offline relaunch, and concurrent editing on the deployed origin.
 4. Continue the financial milestones after owner review: immutable balanced ledger, reimbursements, savings goals, recurring costs, reporting and month close. Preserve integer cents, deterministic rounding, explicit planned/earmarked/paid/owed states and correction history.
 
 The owner explicitly authorized beginning the architecture implementation while M0 visual acceptance remains pending. This does not imply acceptance of other milestones. The first sync slice covers monthly proposals, not real financial postings. Future ledger sync needs stable operation IDs, immutable events, idempotency and validation; do not generalize mutable draft replacement to posted expenses.
 
 ## Review gates
 
-Implementation slice: device draft storage and revisions, per-month GitHub adapter, visible sync status/recovery/export, build-generated PWA cache and manifest/icons, and Pages workflow are implemented. Live GitHub pairing and real phone installation remain pending owner setup. Synchronization currently processes the selected month; opening another month processes its pending draft. Export covers one saved month; JSON import/merge and SQLite migration are deferred.
+Implementation slice: device draft storage and revisions, per-month GitHub adapter, visible sync status/recovery/export, build-generated PWA cache and manifest/icons, and a committed root Pages build are implemented. Live GitHub pairing and real phone installation remain pending owner setup. Synchronization currently processes the selected month; opening another month processes its pending draft. Export covers one saved month; JSON import/merge and SQLite migration are deferred.
 
 - A static production build works at `/family-app/` without an API server.
 - Saved proposals survive offline reload; invalid input and stale local writes are rejected.
@@ -33,4 +35,4 @@ Implementation slice: device draft storage and revisions, per-month GitHub adapt
 - The app distinguishes device-only, pending, synchronized, failure and conflict. Remote recovery requires an explicit warning and export option.
 - GitHub setup and the real two-device drill remain required before claiming deployment readiness.
 
-References: [GitHub Contents API](https://docs.github.com/en/rest/repos/contents), [fine-grained tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages), [PWA installability](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
+References: [GitHub Contents API](https://docs.github.com/en/rest/repos/contents), [fine-grained tokens](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens), [Pages publishing source](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site), [PWA installability](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).

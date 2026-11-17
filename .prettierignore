@@ -6,3 +6,8 @@ family_manager_v1_plan.md
 data
 playwright-report
 test-results
+/assets/
+/icons/
+/index.html
+/manifest.webmanifest
+/sw.js

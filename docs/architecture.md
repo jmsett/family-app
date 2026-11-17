@@ -14,6 +14,10 @@ Tokens live in component memory, with nonpersistent password entry. No applicati
 
 The API contract and decisions below describe the legacy server prototype. It remains available for development; the browser uses this device contract in production.
 
+## ADR 008: Branch deployment matching Nunz
+
+The owner chose **Deploy from a branch → main → /(root)**. `npm run build:pages` builds the PWA for `/family-app/` and copies browser-ready files from `apps/web/dist` into the repository root. `.pages-files.json` identifies generated artifacts, allowing the preparation script to delete obsolete build files while preserving source and documentation. `.nojekyll` bypasses Jekyll. Generated bundles are excluded from lint/formatting; CI rebuilds and checks their Git diff to catch stale public assets. GitHub's standard branch Pages workflow publishes the committed build. The custom Pages deployment workflow is removed. Only public app assets are copied; credentials and private repository data never enter the build.
+
 ## ADR 001: Virtual funds and money
 
 Accepted for M0 implementation, subject to owner review. One household currency (EUR), two proposed contributors, Europe/Busingen timezone. Targets, commitments, self-reported earmarking, actual expenses, payables and forecasts are separate concepts. M0 implements **targets only**; recorded totals are explicitly zero, since no financial-entry capability exists yet. Never infer bank balances. General savings is included in the total allocation. Default categories: Groceries, Home & bills, Transport, Health, Leisure, Other.

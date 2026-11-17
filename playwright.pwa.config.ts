@@ -10,9 +10,7 @@ export default defineConfig({
       : undefined,
   },
   webServer: {
-    env: { VITE_BASE_PATH: '/family-app/' },
-    command:
-      'npm exec -- vite preview --config apps/web/vite.config.ts --host localhost --port 4173 --strictPort',
+    command: 'npm run preview:pages',
     url: 'http://localhost:4173/family-app/',
     reuseExistingServer: false,
   },

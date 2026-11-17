@@ -7,7 +7,7 @@
 **Status: implemented; live GitHub/phone setup and owner review pending.**
 
 - Browser monthly drafts use IndexedDB with atomic revision checks; the production browser no longer requires the API.
-- Manifest, PNG icons, scoped build-versioned shell cache and Pages deployment workflow are included.
+- Manifest, PNG icons, scoped build-versioned shell cache and a committed root build for Pages branch deployment are included.
 - A memory-only token connects to private `jmsett/family-data`, with per-month schema validation, SHA write protection, pending/error/conflict status, JSON export and confirmed remote recovery.
 - Sync is limited to the selected monthly proposal while the app is open. This is not the future financial ledger sync implementation.
 - Follow README GitHub setup, test installation on both phones, edit offline and verify conflicts before using household data. No live tokens or private records were used in development.
@@ -15,6 +15,8 @@
 **Verification:** `npm run check` covers type checking, lint, 35 domain/API/GitHub protocol tests, build and formatting. Six planner browser cases and four production PWA cases pass in desktop/mobile Chromium. Production cases exercise `/family-app/`, offline reload/save, two isolated devices, remote pull/push, divergent edits, JSON export and explicit recovery. Live GitHub API access, remote workflow results and installation on actual phones remain unverified.
 
 Each milestone ends with working software, verification evidence and a concrete review walkthrough. **Only the owner can accept a milestone.** Passing tests is not approval. Record their genuine feedback here, resolve requested changes, and get explicit acceptance before beginning the next milestone. Do not infer approval from silence.
+
+**Hosting correction:** Owner confirmed the same branch deployment used by `nunz-app`. Use `main` / `(root)` with the generated static build committed alongside source. The custom Actions deployment is removed; CI verifies artifact freshness.
 
 ## M0 — Foundation and monthly planning
 
