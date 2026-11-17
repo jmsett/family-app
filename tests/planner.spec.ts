@@ -40,7 +40,7 @@ test('overview shows only confirmed funds while monthly planning derives 50/50 t
   await expect(page.getByTestId('operating-funds')).toHaveText('€400.00');
   await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
   await expect(
-    page.getByRole('button', { name: 'Confirm my transfer' }),
+    page.getByRole('button', { name: 'Confirm my operating transfer' }),
   ).toHaveCount(0);
   await confirm(page, '1');
   await expect(page.getByTestId('operating-funds')).toHaveText('€800.01');
@@ -51,7 +51,12 @@ test('overview shows only confirmed funds while monthly planning derives 50/50 t
   });
   await page.getByLabel('Planning month').fill('2030-02');
   await expect(page.getByTestId('operating-funds')).toHaveText('€800.01');
-  await expect(page.getByText('0 of 2 confirmed')).toBeVisible();
+  await expect(
+    page.getByRole('button', {
+      name: 'Confirm my operating transfer',
+      exact: true,
+    }),
+  ).toBeVisible();
   await navigate(page, 'Monthly plan');
   await expect(
     page.getByText('Due 2030-02-28', { exact: false }),
@@ -175,14 +180,7 @@ test('appearance persists across reopening, updates real bar colors and respects
   await expect(
     page.getByRole('img', { name: 'JML multicolor logo' }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('progressbar', { name: 'Operating funding' }),
-  ).toHaveAttribute('aria-valuenow', '0');
-  await expect(
-    page
-      .getByRole('progressbar', { name: 'Operating funding' })
-      .locator('.bar-fill'),
-  ).toHaveCount(0);
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
   await navigate(page, 'Settings');
   const appearance = page.getByRole('region', {
     name: 'Appearance',
@@ -212,11 +210,11 @@ test('appearance persists across reopening, updates real bar colors and respects
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.getByTestId('operating-funds')).toHaveText('€0.00');
-  await expect(
-    page.getByRole('progressbar', { name: 'Savings funding' }),
-  ).toHaveCSS('--stop-1', '#12abcd');
   await navigate(page, 'Settings');
   await appearance.locator('summary').first().click();
+  await expect(
+    page.getByRole('progressbar', { name: 'Savings preview', exact: true }),
+  ).toHaveCSS('--stop-1', '#12abcd');
   await expect(page.getByLabel('Theme', { exact: true })).toHaveValue('light');
   await expect(page.getByLabel('Bar effect', { exact: true })).toHaveValue(
     'prism',

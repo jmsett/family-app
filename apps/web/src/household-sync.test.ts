@@ -33,7 +33,7 @@ describe('household sync with immutable confirmations', () => {
     ).toHaveLength(1);
     expect(() =>
       reconcile(local({ document: a }), {
-        document: { ...b, transfers: [{ ...b.transfers[0], savingsMinor: 1 }] },
+        document: { ...b, transfers: [{ ...b.transfers[0], amountMinor: 1 }] },
         sha: 'b',
       }),
     ).toThrow('Conflicting confirmations');
@@ -91,7 +91,7 @@ describe('household GitHub format', () => {
     expect(result?.document.expenses).toEqual([]);
     expect(result?.document.transfers).toEqual([]);
   });
-  it('round trips schema v3, preserves Unicode, uses SHA and excludes secrets', async () => {
+  it('round trips schema v4, preserves Unicode, uses SHA and excludes secrets', async () => {
     let encoded = '';
     const doc = { ...base, memberNames: ['José', '愛'] as [string, string] };
     const fetcher = vi
@@ -144,4 +144,47 @@ it('upgrades schema2 JSON and preserves immutable ledger entries during remote p
   );
   expect(recovered.ledger).toEqual([entry]);
   expect(recovered.memberNames).toEqual(['Alex', 'Sam']);
+});
+
+it('merges independent operating/savings declarations for the same member and protects both during recovery', async () => {
+  const { confirmFundTransfer } = await import('@family/domain');
+  const fundedBase = {
+    ...base,
+    expenses: [
+      {
+        id: 'rent',
+        name: 'Rent',
+        amountMinor: 80000,
+        firstDueDate: '2030-01-01',
+        endDate: null,
+        archivedFromMonth: null,
+        category: 'Home',
+        labels: [],
+      },
+    ],
+  };
+  const a = confirmFundTransfer(
+    fundedBase,
+    '2030-01',
+    0,
+    'operating',
+    '2030-01-01T12:00:00Z',
+  );
+  const b = confirmFundTransfer(
+    fundedBase,
+    '2030-01',
+    0,
+    'savings',
+    '2030-01-02T12:00:00Z',
+  );
+  const merged = reconcile(local({ document: a, base: fundedBase }), {
+    document: b,
+    sha: 'b',
+  });
+  expect(merged.transfers).toHaveLength(2);
+  expect(merged.transfers.reduce((s, t) => s + t.amountMinor, 0)).toBe(50000);
+  expect(
+    reconcile(local({ document: merged }), { document: base, sha: 'c' }, true)
+      .transfers,
+  ).toEqual(merged.transfers);
 });

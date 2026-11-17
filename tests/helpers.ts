@@ -38,9 +38,15 @@ export async function confirm(page: Page, member: '0' | '1') {
   await navigate(page, 'Settings');
   await page.getByLabel('Your identity').selectOption(member);
   await navigate(page, 'Overview');
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Confirm my transfer' }).click();
-  await expect(
-    page.getByText('Your transfer is recorded.', { exact: false }),
-  ).toBeVisible();
+  for (const fund of ['operating', 'savings']) {
+    const button = page.getByRole('button', {
+      name: `Confirm my ${fund} transfer`,
+      exact: true,
+    });
+    if (await button.count()) {
+      page.once('dialog', (d) => d.accept());
+      await button.click();
+      await expect(button).toHaveCount(0);
+    }
+  }
 }

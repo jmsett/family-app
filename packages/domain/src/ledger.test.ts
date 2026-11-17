@@ -268,3 +268,99 @@ describe('offline immutable ledger merge', () => {
     ).toBe(-1000);
   });
 });
+
+it('records savings transfers, withdrawals and purchases once and reverses movements without affecting personal debt', async () => {
+  const { confirmFundTransfer } = await import('./index');
+  let doc = confirmFundTransfer(
+    {
+      ...initialHousehold(),
+      savingsTargets: [{ month: '2026-11', amountMinor: 200000 }],
+    },
+    '2026-11',
+    0,
+    'savings',
+    createdAt,
+  );
+  const movement = {
+    id: 'move',
+    kind: 'fund-movement' as const,
+    from: 'savings' as const,
+    to: 'operating' as const,
+    amountMinor: 20000,
+    date,
+    createdAt,
+    actor: 'a' as const,
+    note: 'Move savings to operating',
+  };
+  doc = appendEntries(doc, [movement]);
+  expect(recordedFunds(doc, '2026-11')).toMatchObject({
+    operatingMinor: 20000,
+    savingsMinor: 80000,
+  });
+  doc = appendEntries(doc, [
+    {
+      ...movement,
+      id: 'withdrawal',
+      to: 'external',
+      amountMinor: 5000,
+      note: 'Leave tracked funds',
+    },
+  ]);
+  const purchase = {
+    ...expense('savings-purchase', 10000, 'household', [0, 0, 1]),
+    fund: 'savings' as const,
+  };
+  doc = appendEntries(doc, [purchase]);
+  expect(recordedFunds(doc, '2026-12')).toMatchObject({
+    operatingMinor: 20000,
+    savingsMinor: 65000,
+  });
+  expect(netBalances(doc.ledger)).toEqual({ a: 0, b: 0, household: 0 });
+  expect(categorySpending(doc, '2026-11-01', '2026-11-30')).toEqual([
+    { category: 'Food', amountMinor: 10000 },
+  ]);
+  doc = appendEntries(doc, [reverse('move', 'reverse-movement')]);
+  expect(recordedFunds(doc, '2026-12')).toMatchObject({
+    operatingMinor: 0,
+    savingsMinor: 85000,
+  });
+  expect(mergeLedger(doc.ledger, doc.ledger)).toHaveLength(4);
+});
+it('computes personal history impact from the funding party, separately from who entered an expense', async () => {
+  const { memberImpact } = await import('./index');
+  const otherPaid = expense('other', 8000, 'b');
+  expect(otherPaid.actor).toBe('a');
+  expect(memberImpact(otherPaid, 'a', [otherPaid])).toBe(-4000);
+  expect(memberImpact(otherPaid, 'b', [otherPaid])).toBe(4000);
+  const householdPaid = { ...otherPaid, source: 'household' as const };
+  expect(memberImpact(householdPaid, 'b', [householdPaid])).toBe(-4000);
+  expect(memberImpact(payment('partial', 'a', 'b', 1000), 'a', [])).toBe(1000);
+  expect(memberImpact(reverse(otherPaid.id), 'a', [otherPaid])).toBe(4000);
+});
+it('allows a household repayment to use savings without counting another expense', () => {
+  let doc = appendEntries(initialHousehold(), [
+    expense('advance', 8000, 'a', [0, 0, 1]),
+  ]);
+  doc = appendEntries(doc, [
+    { ...payment('refund', 'household', 'a', 8000), fund: 'savings' },
+  ]);
+  expect(recordedFunds(doc, '2026-11')).toMatchObject({
+    operatingMinor: 0,
+    savingsMinor: -8000,
+    householdPayables: 0,
+  });
+  expect(categorySpending(doc, '2026-11-01', '2026-11-30')[0].amountMinor).toBe(
+    8000,
+  );
+});
+
+it('upgrades schema3 without changing any posted expense or its personal balance', () => {
+  const original = expense('before-upgrade');
+  const doc = upgradeHousehold({
+    ...initialHousehold(),
+    schemaVersion: 3,
+    ledger: [original],
+  });
+  expect(doc.ledger).toEqual([original]);
+  expect(netBalances(doc.ledger)).toEqual({ a: 4000, b: -4000, household: 0 });
+});

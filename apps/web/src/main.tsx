@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   canonicalHousehold,
-  confirmTransfer,
+  confirmFundTransfer,
+  fundingStatus,
   EXPENSE_CATEGORIES,
   monthlyPlan,
   parseMoney,
@@ -11,13 +12,14 @@ import {
   validateExpense,
   validateHousehold,
 } from '@family/domain';
-import type { HouseholdPlan, RecurringExpense } from '@family/shared';
+import type { Fund, HouseholdPlan, RecurringExpense } from '@family/shared';
 import { readRecord, saveHousehold } from './storage';
+import { FundActivity } from './FundActivity';
 import { LedgerPanel } from './LedgerPanel';
 import { SyncPanel } from './SyncPanel';
 import { useAppearance } from './appearance';
 import { AppearancePanel } from './AppearancePanel';
-import { AppearanceContext, ProgressBar } from './ProgressBar';
+import { AppearanceContext } from './ProgressBar';
 import './style.css';
 
 const money = (value: number) =>
@@ -461,84 +463,119 @@ function Overview({
 }) {
   const plan = monthlyPlan(document, month);
   const funds = recordedFunds(document, month);
-  const recorded = plan.transfers.find((t) => String(t.member) === member);
-  async function confirm() {
+  const [ledgerDirty, setLedgerDirty] = useState(false),
+    [movementOpen, setMovementOpen] = useState(false);
+  useEffect(
+    () => onDirty(ledgerDirty || movementOpen),
+    [ledgerDirty, movementOpen, onDirty],
+  );
+  useEffect(() => () => onDirty(false), [onDirty]);
+  async function confirm(fund: Fund) {
     if (member !== '0' && member !== '1') return;
     const index = Number(member) as 0 | 1;
+    const status = fundingStatus(document, month, index, fund);
+    if (status.complete) return;
     if (
       window.confirm(
-        `I am ${document.memberNames[index]} and confirm I transferred ${money(plan.operatingShares[index])} for operating funds and ${money(plan.savingsShares[index])} for savings in ${monthName(month)}. This is my declaration, not bank verification.`,
+        `I am ${document.memberNames[index]} and confirm I transferred ${money(status.target)} for ${fund} in ${monthName(month)}. This is my declaration, not bank verification.`,
       )
     )
       await commit(
-        confirmTransfer(document, month, index, new Date().toISOString()),
+        confirmFundTransfer(
+          document,
+          month,
+          index,
+          fund,
+          new Date().toISOString(),
+        ),
       );
   }
   return (
     <>
-      <section className="funds-grid" aria-label="Confirmed funds">
-        <article className="summary-card total">
-          <span className="card-label">Operating funds</span>
-          <strong data-testid="operating-funds">
-            {money(funds.unencumberedMinor)}
-          </strong>
-          <div className="funding-progress">
-            <ProgressBar
-              label="Operating funding"
-              variant="operating"
-              value={
-                plan.operatingMinor
-                  ? (plan.confirmedOperatingMinor / plan.operatingMinor) * 100
-                  : 0
-              }
-              valueText={
-                plan.operatingMinor
-                  ? `${Math.round((plan.confirmedOperatingMinor / plan.operatingMinor) * 100)}% of month funded`
-                  : 'No current target'
-              }
-            />
-            <small>
-              {plan.operatingMinor
-                ? `${Math.round((plan.confirmedOperatingMinor / plan.operatingMinor) * 100)}% of month funded`
-                : 'No current target'}
-            </small>
-          </div>
-        </article>
-        <article className="summary-card">
-          <span className="card-label">Savings funds</span>
-          <strong data-testid="savings-funds">
-            {money(funds.savingsMinor)}
-          </strong>
-          <div className="funding-progress">
-            <ProgressBar
-              label="Savings funding"
-              variant="savings"
-              value={
-                plan.savingsMinor
-                  ? (plan.confirmedSavingsMinor / plan.savingsMinor) * 100
-                  : 0
-              }
-              valueText={
-                plan.savingsMinor
-                  ? `${Math.round((plan.confirmedSavingsMinor / plan.savingsMinor) * 100)}% of month funded`
-                  : 'No current target'
-              }
-            />
-            <small>
-              {plan.savingsMinor
-                ? `${Math.round((plan.confirmedSavingsMinor / plan.savingsMinor) * 100)}% of month funded`
-                : 'No current target'}
-            </small>
-          </div>
-        </article>
+      <section className="funds-grid" aria-label="Recorded funds">
+        {(['operating', 'savings'] as const).map((fund) => (
+          <article className="summary-card" key={fund}>
+            <span className="card-label">
+              {fund === 'operating' ? 'Operating funds' : 'Savings funds'}
+            </span>
+            <strong data-testid={`${fund}-funds`}>
+              {money(
+                fund === 'operating'
+                  ? funds.unencumberedMinor
+                  : funds.savingsMinor,
+              )}
+            </strong>
+            <div
+              className="fund-confirmations"
+              aria-label={`${fund} confirmations for ${monthName(month)}`}
+            >
+              {document.memberNames.map((name, i) => {
+                const status = fundingStatus(document, month, i as 0 | 1, fund);
+                const mine = member === String(i);
+                const label = status.notRequired
+                  ? `${name}: ${fund} not required`
+                  : status.confirmation
+                    ? `${name}: ${fund} confirmed ${money(status.confirmation.amountMinor)}`
+                    : mine
+                      ? `Confirm my ${fund} transfer`
+                      : `${name}: ${fund} awaiting confirmation`;
+                return (
+                  <button
+                    type="button"
+                    className={`fund-check ${status.complete ? 'complete' : ''}`}
+                    key={i}
+                    title={`${name}: ${status.notRequired ? 'No transfer required' : status.confirmation ? 'Confirmed' : `${money(status.target)} pending`}`}
+                    aria-label={label}
+                    disabled={
+                      disabled ||
+                      ledgerDirty ||
+                      movementOpen ||
+                      status.complete ||
+                      !mine
+                    }
+                    onClick={() => void confirm(fund)}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      aria-hidden="true"
+                    >
+                      <path d="m5 12 4 4L19 6" />
+                    </svg>
+                    <span>{name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </article>
+        ))}
       </section>
       <p className="funds-note">
-        Recorded funds through {monthName(month)}, after spending and
-        outstanding household debts. Self-reported, not bank-verified.
+        Balances through {monthName(month)} · checkmarks show this month's
+        transfers.
         {funds.householdPayables > 0 && (
           <span className="funds-reserve">
             Operating pool {money(funds.operatingMinor)} · reserved for net
             household debts {money(funds.householdPayables)}.
+          </span>
+        )}
+        {!member && (
+          <span className="funds-reserve">
+            <button className="inline-link" onClick={openSettings}>
+              Choose your name in Settings
+            </button>{' '}
+            to confirm your transfers.
+          </span>
+        )}
+        {plan.totalMinor === 0 && (
+          <span className="funds-reserve">
+            <button className="inline-link" onClick={openPlan}>
+              Set monthly funding targets
+            </button>
           </span>
         )}
       </p>
@@ -548,89 +585,21 @@ function Overview({
         member={member === '0' ? 'a' : member === '1' ? 'b' : ''}
         month={month}
         today={today}
-        disabled={disabled}
+        disabled={disabled || movementOpen}
         commit={commit}
         openSettings={openSettings}
-        onDirty={onDirty}
+        onDirty={setLedgerDirty}
       />
-      <section className="panel" aria-label="Member transfers">
-        <div className="section-heading">
-          <h2>Member transfers</h2>
-          <span className="subtle-label">
-            {plan.transfers.length} of 2 confirmed
-          </span>
-        </div>
-        <div className="transfer-list">
-          {document.memberNames.map((name, i) => {
-            const transfer = plan.transfers.find((t) => t.member === i);
-            return (
-              <div className="transfer-row" key={i}>
-                <div>
-                  <strong>{name}</strong>
-                  <small>
-                    {transfer
-                      ? `${money(transfer.operatingMinor)} operating · ${money(transfer.savingsMinor)} savings`
-                      : 'Awaiting transfer confirmation'}
-                  </small>
-                </div>
-                <span
-                  className={transfer ? 'confirmed-badge' : 'pending-badge'}
-                >
-                  {transfer ? 'Confirmed' : 'Pending'}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="confirmation-form">
-          {!member && (
-            <p className="muted">
-              <button className="inline-link" onClick={openSettings}>
-                Choose your name in Settings
-              </button>{' '}
-              to confirm a transfer.
-            </p>
-          )}
-          {recorded ? (
-            <p className="muted">
-              Your transfer is recorded. Plan changes do not alter confirmed
-              amounts.
-            </p>
-          ) : (
-            <>
-              {member && (
-                <p className="transfer-breakdown">
-                  Your transfer:{' '}
-                  <strong>{money(plan.operatingShares[Number(member)])}</strong>{' '}
-                  operating +{' '}
-                  <strong>{money(plan.savingsShares[Number(member)])}</strong>{' '}
-                  savings.
-                </p>
-              )}
-              <button
-                className="primary"
-                disabled={disabled || !member || plan.totalMinor === 0}
-                onClick={() => void confirm()}
-              >
-                Confirm my transfer
-              </button>
-            </>
-          )}
-          {plan.totalMinor === 0 && (
-            <p className="muted">
-              Define your recurring expenses and savings in{' '}
-              <button className="inline-link" onClick={openPlan}>
-                Monthly plan
-              </button>{' '}
-              first.
-            </p>
-          )}
-          <p className="muted">
-            Confirm only after making the transfer. Monthly funding does not
-            settle personal debts.
-          </p>
-        </div>
-      </section>
+      <FundActivity
+        document={document}
+        member={member === '0' ? 'a' : member === '1' ? 'b' : ''}
+        today={today}
+        disabled={disabled || ledgerDirty}
+        open={movementOpen}
+        setOpen={setMovementOpen}
+        commit={commit}
+        openSettings={openSettings}
+      />
     </>
   );
 }
@@ -946,6 +915,7 @@ function App() {
             <>
               {view === 'overview' && (
                 <Overview
+                  key={month}
                   document={document}
                   month={month}
                   disabled={busy || syncBusy}

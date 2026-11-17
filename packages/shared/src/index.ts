@@ -34,16 +34,17 @@ export interface RecurringExpense {
   category: string;
   labels: string[];
 }
+export type Fund = 'operating' | 'savings';
 export interface TransferConfirmation {
   id: string;
   month: string;
   member: 0 | 1;
-  operatingMinor: number;
-  savingsMinor: number;
+  fund: Fund;
+  amountMinor: number;
   confirmedAt: string;
 }
 export interface HouseholdPlan {
-  schemaVersion: 3;
+  schemaVersion: 4;
   revision: number;
   memberNames: [string, string];
   expenses: RecurringExpense[];
@@ -69,6 +70,7 @@ export interface PostedExpense extends LedgerBase {
   amountMinor: number;
   payer: Party;
   source: 'personal' | 'household';
+  fund?: Fund;
   splitMode: SplitMode;
   splitInput: Shares;
   shares: Shares;
@@ -77,6 +79,7 @@ export interface PostedExpense extends LedgerBase {
 }
 export interface DebtSettlement extends LedgerBase {
   kind: 'settlement';
+  fund?: Fund;
   from: Party;
   to: Party;
   amountMinor: number;
@@ -87,4 +90,12 @@ export interface LedgerReversal extends LedgerBase {
   targetId: string;
   reason: string;
 }
-export type LedgerEvent = PostedExpense | DebtSettlement | LedgerReversal;
+export interface FundMovement extends LedgerBase {
+  kind: 'fund-movement';
+  from: Fund;
+  to: Fund | 'external';
+  amountMinor: number;
+  note: string;
+}
+export type LedgerEvent =
+  PostedExpense | DebtSettlement | LedgerReversal | FundMovement;

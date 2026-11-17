@@ -1,5 +1,6 @@
 import type {
   BudgetDraft,
+  Fund,
   HouseholdPlan,
   RecurringExpense,
   TransferConfirmation,
@@ -38,7 +39,7 @@ function amount(value: number) {
 }
 export function initialHousehold(): HouseholdPlan {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     revision: 0,
     memberNames: ['Member A', 'Member B'],
     expenses: [],
@@ -112,7 +113,7 @@ export function dueDate(
 export function validateHousehold(doc: HouseholdPlan): void {
   if (
     !doc ||
-    doc.schemaVersion !== 3 ||
+    doc.schemaVersion !== 4 ||
     !Number.isSafeInteger(doc.revision) ||
     doc.revision < 0 ||
     !Array.isArray(doc.expenses) ||
@@ -132,7 +133,7 @@ export function validateHousehold(doc: HouseholdPlan): void {
   });
   if (
     doc.expenses.length > 1000 ||
-    doc.transfers.length > 2500 ||
+    doc.transfers.length > 5000 ||
     doc.savingsTargets.length > 1212 ||
     doc.legacyDrafts.length > 1212
   )
@@ -156,15 +157,15 @@ export function validateHousehold(doc: HouseholdPlan): void {
       !transfer ||
       !validMonth(transfer.month) ||
       ![0, 1].includes(transfer.member) ||
-      transfer.id !== `${transfer.month}:${transfer.member}` ||
+      !(['operating', 'savings'] as string[]).includes(transfer.fund) ||
+      transfer.id !== `${transfer.month}:${transfer.member}:${transfer.fund}` ||
       ids.has(transfer.id) ||
       typeof transfer.confirmedAt !== 'string' ||
       !Number.isFinite(Date.parse(transfer.confirmedAt))
     )
       throw new Error('Invalid or duplicate transfer confirmation.');
-    amount(transfer.operatingMinor);
-    amount(transfer.savingsMinor);
-    if (transfer.operatingMinor + transfer.savingsMinor <= 0)
+    amount(transfer.amountMinor);
+    if (transfer.amountMinor <= 0)
       throw new Error('A transfer must contain a positive amount.');
     ids.add(transfer.id);
   }
@@ -183,11 +184,11 @@ export function validateHousehold(doc: HouseholdPlan): void {
     const savings = savingsFor(doc, month);
     amount(operating);
     amount(operating + savings);
-    for (const key of ['operatingMinor', 'savingsMinor'] as const)
+    for (const fund of ['operating', 'savings'] as const)
       amount(
         doc.transfers
-          .filter((t) => t.month === month)
-          .reduce((sum, t) => sum + t[key], 0),
+          .filter((t) => t.month === month && t.fund === fund)
+          .reduce((sum, t) => sum + t.amountMinor, 0),
       );
   }
 }
@@ -231,17 +232,55 @@ export function monthlyPlan(doc: HouseholdPlan, month: string) {
     operatingShares,
     savingsShares,
     memberTargets,
-    confirmedOperatingMinor: transfers.reduce(
-      (sum, t) => sum + t.operatingMinor,
-      0,
-    ),
-    confirmedSavingsMinor: transfers.reduce(
-      (sum, t) => sum + t.savingsMinor,
-      0,
-    ),
+    confirmedOperatingMinor: transfers
+      .filter((t) => t.fund === 'operating')
+      .reduce((sum, t) => sum + t.amountMinor, 0),
+    confirmedSavingsMinor: transfers
+      .filter((t) => t.fund === 'savings')
+      .reduce((sum, t) => sum + t.amountMinor, 0),
     transfers,
   };
 }
+export function confirmFundTransfer(
+  doc: HouseholdPlan,
+  month: string,
+  member: 0 | 1,
+  fund: Fund,
+  confirmedAt: string,
+): HouseholdPlan {
+  if (member !== 0 && member !== 1)
+    throw new Error('Choose a household member.');
+  if (
+    doc.transfers.some(
+      (t) => t.month === month && t.member === member && t.fund === fund,
+    )
+  )
+    throw new Error(
+      'This member has already confirmed this fund for the month.',
+    );
+  const plan = monthlyPlan(doc, month);
+  const amountMinor = (
+    fund === 'operating' ? plan.operatingShares : plan.savingsShares
+  )[member];
+  if (!amountMinor) throw new Error('No transfer is required for this fund.');
+  const next = {
+    ...doc,
+    transfers: [
+      ...doc.transfers,
+      {
+        id: `${month}:${member}:${fund}`,
+        month,
+        member,
+        fund,
+        amountMinor,
+        confirmedAt,
+      },
+    ],
+  };
+  validateHousehold(next);
+  return next;
+}
+// Retained for combined declarations in domain integrations; the UI confirms each fund independently.
 export function confirmTransfer(
   doc: HouseholdPlan,
   month: string,
@@ -249,19 +288,35 @@ export function confirmTransfer(
   confirmedAt: string,
 ): HouseholdPlan {
   if (doc.transfers.some((t) => t.month === month && t.member === member))
-    throw new Error('This member has already confirmed this month’s transfer.');
+    throw new Error('This member has already confirmed a transfer this month.');
   const plan = monthlyPlan(doc, month);
-  const transfer: TransferConfirmation = {
-    id: `${month}:${member}`,
-    month,
-    member,
-    operatingMinor: plan.operatingShares[member],
-    savingsMinor: plan.savingsShares[member],
-    confirmedAt,
-  };
-  const next = { ...doc, transfers: [...doc.transfers, transfer] };
-  validateHousehold(next);
+  let next = doc;
+  if (plan.operatingShares[member])
+    next = confirmFundTransfer(next, month, member, 'operating', confirmedAt);
+  if (plan.savingsShares[member])
+    next = confirmFundTransfer(next, month, member, 'savings', confirmedAt);
+  if (next === doc) throw new Error('No transfer is required.');
   return next;
+}
+export function fundingStatus(
+  doc: HouseholdPlan,
+  month: string,
+  member: 0 | 1,
+  fund: Fund,
+) {
+  const plan = monthlyPlan(doc, month);
+  const confirmation = plan.transfers.find(
+    (t) => t.member === member && t.fund === fund,
+  );
+  const target = (
+    fund === 'operating' ? plan.operatingShares : plan.savingsShares
+  )[member];
+  return {
+    confirmation,
+    target,
+    complete: !!confirmation || target === 0,
+    notRequired: !confirmation && target === 0,
+  };
 }
 export function migrateLegacyDrafts(drafts: BudgetDraft[]): HouseholdPlan {
   const legacyDrafts = [...drafts].sort((a, b) =>
@@ -302,10 +357,44 @@ export function upgradeHousehold(value: unknown): HouseholdPlan {
   if (!value || typeof value !== 'object')
     throw new Error('Invalid household data.');
   const raw = value as Record<string, unknown>;
-  const next =
-    raw.schemaVersion === 2
-      ? { ...raw, schemaVersion: 3, ledger: raw.ledger ?? [] }
-      : raw;
+  let next = raw;
+  if (raw.schemaVersion === 2 || raw.schemaVersion === 3) {
+    if (!Array.isArray(raw.transfers))
+      throw new Error('Invalid transfer history.');
+    const ids = new Set<string>();
+    const transfers: TransferConfirmation[] = [];
+    for (const old of raw.transfers) {
+      if (
+        !old ||
+        old.id !== `${old.month}:${old.member}` ||
+        ids.has(old.id) ||
+        !validMonth(old.month) ||
+        ![0, 1].includes(old.member) ||
+        typeof old.confirmedAt !== 'string' ||
+        !Number.isFinite(Date.parse(old.confirmedAt))
+      )
+        throw new Error('Invalid legacy transfer confirmation.');
+      amount(old.operatingMinor);
+      amount(old.savingsMinor);
+      if (old.operatingMinor + old.savingsMinor <= 0)
+        throw new Error('Invalid empty legacy transfer.');
+      ids.add(old.id);
+      for (const fund of ['operating', 'savings'] as const) {
+        const amountMinor =
+          fund === 'operating' ? old.operatingMinor : old.savingsMinor;
+        if (amountMinor > 0)
+          transfers.push({
+            id: `${old.id}:${fund}`,
+            month: old.month,
+            member: old.member,
+            fund,
+            amountMinor,
+            confirmedAt: old.confirmedAt,
+          });
+      }
+    }
+    next = { ...raw, schemaVersion: 4, ledger: raw.ledger ?? [], transfers };
+  }
   validateHousehold(next as unknown as HouseholdPlan);
   return next as unknown as HouseholdPlan;
 }

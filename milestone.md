@@ -1,6 +1,18 @@
 # Milestones and owner review gates
 
-## Shared expenses and settlements — current review slice
+## Compact expenses and independent fund confirmations — current review slice
+
+**Status: implemented; owner review pending.** Owner approved this pass and selected the historical chart explorer as the next separate step.
+
+- Basic expense form contains only quick setup, description, amount, category and labels; both members’ payer perspectives are supported, with advanced split/account settings collapsed.
+- Signed JML cyan/orange balances and personal history effects; per-entry Details and section Filters are collapsed. Category charts show bars only.
+- Cumulative fund cards show independent monthly operating/savings checkmarks. Zero shares are automatically not required without fabricated contributions. Existing combined confirmations migrate to schema4 member/month/fund records.
+- Fund activity replaces duplicate transfer status and supports immutable operating/savings movements and withdrawals. Savings-funded purchases/repayments affect the selected account once; transfers never inflate expenses or debt.
+- Verification: 69 domain/API/sync tests, desktop/Android workflows, production offline and mocked GitHub synchronization; actual phone use and live private-repository behavior remain owner review checks.
+
+**Next:** Historical chart explorer with mobile pan/zoom and daily/weekly/monthly/yearly intervals; compare spending totals, cumulative savings, operating balances and operating budget targets. Keep advanced controls collapsed. This pass does not implement that explorer or configurable unequal responsibilities.
+
+## Shared expenses and settlements — earlier review slice
 
 **Status: implemented; owner review pending.** Authorized by “Ok, go ahead” after the expense/settlement proposal.
 

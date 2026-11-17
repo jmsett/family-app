@@ -56,7 +56,7 @@ export async function readRecord(): Promise<LocalRecord> {
             tx.abort();
             return;
           }
-          if (oldVersion !== 3) {
+          if (oldVersion !== 4) {
             record.pending = true;
             store.put(record, 'current');
           }
@@ -116,15 +116,25 @@ export async function writeRecord(
           tx.abort();
           return;
         }
-        const current = request.result as LocalRecord | undefined;
+        let current = request.result as LocalRecord | undefined;
+        if (current) {
+          try {
+            current = {
+              ...current,
+              document: upgradeHousehold(current.document),
+            };
+          } catch {
+            tx.abort();
+            return;
+          }
+        }
         if (
           current?.document.transfers.some(
             (recorded) =>
               !next.document.transfers.some(
                 (transfer) =>
                   transfer.id === recorded.id &&
-                  transfer.operatingMinor === recorded.operatingMinor &&
-                  transfer.savingsMinor === recorded.savingsMinor,
+                  transfer.amountMinor === recorded.amountMinor,
               ),
           )
         ) {

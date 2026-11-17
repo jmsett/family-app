@@ -27,19 +27,23 @@ test('expenses, partial repayments and corrections retain history and carry debt
   await identity(page);
   await purchase(page, 'Dinner', '80');
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
-  await expect(page.getByTestId('balance-a')).toHaveText('Owed €40.00');
-  await expect(page.getByTestId('balance-b')).toHaveText('Owes €40.00');
+  await expect(page.getByTestId('balance-a')).toHaveText('+€40.00');
+  await expect(page.getByTestId('balance-b')).toHaveText('−€40.00');
   await page.getByRole('button', { name: 'Settle up', exact: true }).click();
   await page.getByLabel('Settlement amount').fill('15');
   page.once('dialog', (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record payment', exact: true })
     .click();
-  await expect(page.getByTestId('balance-a')).toHaveText('Owed €25.00');
+  await expect(page.getByTestId('balance-a')).toHaveText('+€25.00');
   await page.getByText('Spending by category', { exact: true }).click();
   await expect(page.getByTestId('actual-spending-total')).toHaveText('€80.00');
   await page
     .getByText('Expenses & payment history (2)', { exact: true })
+    .click();
+  await page
+    .getByRole('article', { name: 'expense: Dinner', exact: true })
+    .getByText('Details', { exact: true })
     .click();
   await page
     .getByRole('article', { name: 'expense: Dinner', exact: true })
@@ -48,7 +52,7 @@ test('expenses, partial repayments and corrections retain history and carry debt
   await page.getByLabel('Expense amount', { exact: true }).fill('100');
   await page.getByLabel('Correction reason').fill('Included the tip');
   await page.getByRole('button', { name: 'Save correction' }).click();
-  await expect(page.getByTestId('balance-a')).toHaveText('Owed €35.00');
+  await expect(page.getByTestId('balance-a')).toHaveText('+€35.00');
   await expect(page.getByTestId('actual-spending-total')).toHaveText('€100.00');
   await expect(
     page.getByRole('article', { name: 'expense: Dinner', exact: true }),
@@ -56,6 +60,7 @@ test('expenses, partial repayments and corrections retain history and carry debt
   await expect(
     page.getByRole('article', { name: 'reversal: Reversal: Dinner' }),
   ).toContainText('Included the tip');
+  await page.getByText('Filters', { exact: true }).click();
   await page.getByLabel('History party').selectOption('household');
   await expect(page.getByTestId('actual-spending-total')).toHaveText('€0.00');
   await page.getByLabel('History party').selectOption('all');
@@ -69,10 +74,10 @@ test('expenses, partial repayments and corrections retain history and carry debt
     ),
   ).toBe(true);
   await page.getByLabel('Planning month').fill('2027-01');
-  await expect(page.getByTestId('balance-a')).toHaveText('Owed €35.00');
+  await expect(page.getByTestId('balance-a')).toHaveText('+€35.00');
   await page.reload();
   await expect(page.getByTestId('personal-balance')).toHaveText(
-    'You’re owed €35.00 net',
+    'Your balance +€35.00',
   );
   await navigate(page, 'Settings');
   await expect(page.getByLabel('Your identity')).toHaveValue('0');
@@ -84,18 +89,18 @@ test('household advances reserve funds and household spending creates no duplica
   await identity(page);
   await purchase(page, 'Groceries', '80', 'advance');
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
-  await expect(page.getByTestId('balance-household')).toHaveText('Owes €80.00');
+  await expect(page.getByTestId('balance-household')).toHaveText('−€80.00');
   await expect(page.getByTestId('operating-funds')).toHaveText('-€80.00');
   await page.getByRole('button', { name: 'Settle up', exact: true }).click();
   page.once('dialog', (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record payment', exact: true })
     .click();
-  await expect(page.getByTestId('balance-household')).toHaveText('Settled');
+  await expect(page.getByTestId('balance-household')).toHaveText('€0.00');
   await expect(page.getByTestId('operating-funds')).toHaveText('-€80.00');
   await purchase(page, 'Household bill', '20', 'household');
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
-  await expect(page.getByTestId('balance-household')).toHaveText('Settled');
+  await expect(page.getByTestId('balance-household')).toHaveText('€0.00');
   await expect(page.getByTestId('operating-funds')).toHaveText('-€100.00');
   await page.getByText('Spending by category', { exact: true }).click();
   await expect(page.getByTestId('actual-spending-total')).toHaveText('€100.00');
@@ -107,6 +112,10 @@ test('exact and percentage editors validate totals and work at narrow phone widt
   await page.goto('/');
   await identity(page);
   await purchase(page, 'Transport', '100.01');
+  await page
+    .getByRole('form', { name: 'Add expense', exact: true })
+    .getByText('Advanced options', { exact: true })
+    .click();
   await page.getByLabel('Split method').selectOption('amount');
   await page.getByLabel('Member A split amount', { exact: true }).fill('20');
   await page.getByLabel('Member B split amount', { exact: true }).fill('80');
@@ -115,8 +124,12 @@ test('exact and percentage editors validate totals and work at narrow phone widt
   ).toBeDisabled();
   await page.getByLabel('Member B split amount', { exact: true }).fill('80.01');
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
-  await expect(page.getByTestId('balance-a')).toHaveText('Owed €80.01');
+  await expect(page.getByTestId('balance-a')).toHaveText('+€80.01');
   await purchase(page, 'Tickets', '100.01');
+  await page
+    .getByRole('form', { name: 'Add expense', exact: true })
+    .getByText('Advanced options', { exact: true })
+    .click();
   await page.getByLabel('Split method').selectOption('percentage');
   await page
     .getByLabel('Member A split percentage', { exact: true })
@@ -130,7 +143,7 @@ test('exact and percentage editors validate totals and work at narrow phone widt
     ),
   ).toBe(true);
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
-  await expect(page.getByTestId('balance-a')).toHaveText('Owed €146.69');
+  await expect(page.getByTestId('balance-a')).toHaveText('+€146.69');
 });
 
 test('schema2 upgrades preserve recorded funds, member identity and recurring plans', async ({
@@ -200,7 +213,7 @@ test('schema2 upgrades preserve recorded funds, member identity and recurring pl
   await page.getByLabel('Planning month').fill('2026-11');
   await expect(page.getByTestId('operating-funds')).toHaveText('€500.00');
   await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
-  await expect(page.getByTestId('balance-a')).toHaveText('Settled');
+  await expect(page.getByTestId('balance-a')).toHaveText('€0.00');
   await navigate(page, 'Settings');
   await expect(page.getByLabel('Your identity')).toHaveValue('1');
   await expect(page.getByLabel('First member', { exact: true })).toHaveValue(
@@ -211,6 +224,169 @@ test('schema2 upgrades preserve recorded funds, member identity and recurring pl
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
   await page.reload();
   await page.getByLabel('Planning month').fill('2026-11');
-  await expect(page.getByTestId('balance-b')).toHaveText('Owed €10.00');
+  await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
   await expect(page.getByTestId('operating-funds')).toHaveText('€500.00');
+});
+
+test('quick setups record the other payer with compact personal history and hidden advanced controls', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+  await identity(page);
+  await purchase(page, 'Sam bought dinner', '80', 'other-equal');
+  const form = page.getByRole('form', { name: 'Add expense', exact: true });
+  await expect(form.getByLabel('Split method')).not.toBeVisible();
+  await expect(form.getByLabel('Expense payer')).not.toBeVisible();
+  await expect(form.getByLabel('Expense date')).not.toBeVisible();
+  await expect(form.getByLabel('Actual expense category')).toBeVisible();
+  await page.screenshot({
+    path: `test-results/${testInfo.project.name}-compact-expense.png`,
+    fullPage: true,
+  });
+  await form.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await expect(page.getByTestId('balance-a')).toHaveText('−€40.00');
+  await expect(page.getByTestId('balance-a')).toHaveCSS(
+    'color',
+    'rgb(255, 181, 70)',
+  );
+  await expect(page.getByTestId('balance-b')).toHaveCSS(
+    'color',
+    'rgb(55, 219, 234)',
+  );
+  await page
+    .getByText('Expenses & payment history (1)', { exact: true })
+    .click();
+  await expect(page.getByLabel('History from date')).not.toBeVisible();
+  const row = page.getByRole('article', {
+    name: 'expense: Sam bought dinner',
+    exact: true,
+  });
+  await expect(row.locator('.activity-summary')).toHaveText(
+    'Sam bought dinner−€40.00',
+  );
+  await expect(
+    row.getByRole('button', { name: 'Correct', exact: true }),
+  ).not.toBeVisible();
+  await row.getByText('Details', { exact: true }).click();
+  await expect(
+    row.getByText('Recorded by Member A', { exact: false }),
+  ).toBeVisible();
+  await expect(row.getByText('Member B paid', { exact: false })).toBeVisible();
+  await navigate(page, 'Settings');
+  await page.getByLabel('Your identity').selectOption('1');
+  await navigate(page, 'Overview');
+  await page
+    .getByText('Expenses & payment history (1)', { exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole('article', { name: 'expense: Sam bought dinner', exact: true })
+      .locator('.activity-summary'),
+  ).toHaveText('Sam bought dinner+€40.00');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test('funds confirm independently, zero shares need no transfer, and savings movements preserve totals', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/');
+  await identity(page);
+  await page.getByLabel('Planning month').fill('2026-11');
+  await navigate(page, 'Monthly plan');
+  await page.getByRole('button', { name: 'Add recurring expense' }).click();
+  await page.getByLabel('Expense name', { exact: true }).fill('Bills');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('100');
+  await page.getByLabel('First due date').fill('2026-11-01');
+  await page.getByRole('button', { name: 'Add to plan' }).click();
+  await page.getByLabel('Monthly savings', { exact: true }).fill('200');
+  await page.getByRole('button', { name: 'Save monthly plan' }).click();
+  await navigate(page, 'Overview');
+  await expect(page.getByRole('progressbar')).toHaveCount(0);
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Confirm my operating transfer', exact: true })
+    .click();
+  await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€0.00');
+  await expect(
+    page.getByRole('button', {
+      name: 'Confirm my savings transfer',
+      exact: true,
+    }),
+  ).toBeVisible();
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Confirm my savings transfer', exact: true })
+    .click();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
+  await page.getByText('Fund activity', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Move or withdraw funds', exact: true })
+    .click();
+  await page.getByLabel('Fund movement amount').fill('20');
+  await page
+    .getByLabel('Fund movement description')
+    .fill('Cover operating costs');
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Record movement', exact: true })
+    .click();
+  await expect(page.getByTestId('operating-funds')).toHaveText('€70.00');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€80.00');
+  await page
+    .getByRole('button', { name: 'Move or withdraw funds', exact: true })
+    .click();
+  await page.getByLabel('Move to fund').selectOption('external');
+  await page.getByLabel('Fund movement amount').fill('5');
+  await page
+    .getByLabel('Fund movement description')
+    .fill('Withdraw from tracked savings');
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Record movement', exact: true })
+    .click();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€75.00');
+  await purchase(page, 'Paid from savings', '10', 'household');
+  await page
+    .getByRole('form', { name: 'Add expense', exact: true })
+    .getByText('Advanced options', { exact: true })
+    .click();
+  await page
+    .getByLabel('Expense fund', { exact: true })
+    .selectOption('savings');
+  await page.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€65.00');
+  await page.getByText('Spending by category', { exact: true }).click();
+  await expect(page.getByTestId('actual-spending-total')).toHaveText('€10.00');
+  await page.reload();
+  await page.getByLabel('Planning month').fill('2026-11');
+  await expect(page.getByTestId('operating-funds')).toHaveText('€70.00');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€65.00');
+  await page.screenshot({
+    path: `test-results/${testInfo.project.name}-compact-overview.png`,
+    fullPage: true,
+  });
+  await navigate(page, 'Monthly plan');
+  await page.getByLabel('Planning month').fill('2026-12');
+  await page.getByLabel('Monthly savings', { exact: true }).fill('0.01');
+  await page.getByRole('button', { name: 'Save monthly plan' }).click();
+  await navigate(page, 'Overview');
+  await expect(
+    page.getByRole('button', {
+      name: 'Member A: savings not required',
+      exact: true,
+    }),
+  ).toHaveClass(/complete/);
+  await expect(
+    page.getByRole('button', {
+      name: 'Confirm my savings transfer',
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(page.getByTestId('savings-funds')).toHaveText('€65.00');
 });

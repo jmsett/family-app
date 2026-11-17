@@ -1,5 +1,6 @@
 import type {
   DebtSettlement,
+  FundMovement,
   HouseholdPlan,
   LedgerEvent,
   Party,
@@ -80,15 +81,25 @@ export function canonicalEvent(event: LedgerEvent): string {
       amountMinor: event.amountMinor,
       payer: event.payer,
       source: event.source,
+      ...(event.fund ? { fund: event.fund } : {}),
       splitMode: event.splitMode,
       splitInput: event.splitInput,
       shares: event.shares,
       category: event.category,
       labels: event.labels,
     });
+  if (event.kind === 'fund-movement')
+    return JSON.stringify({
+      ...base,
+      from: event.from,
+      to: event.to,
+      amountMinor: event.amountMinor,
+      note: event.note,
+    });
   if (event.kind === 'settlement')
     return JSON.stringify({
       ...base,
+      ...(event.fund ? { fund: event.fund } : {}),
       from: event.from,
       to: event.to,
       amountMinor: event.amountMinor,
@@ -132,6 +143,9 @@ export function validateLedger(events: LedgerEvent[]): void {
         !positive(event.amountMinor) ||
         !PARTIES.includes(event.payer) ||
         !['personal', 'household'].includes(event.source) ||
+        (event.fund !== undefined &&
+          (!['operating', 'savings'].includes(event.fund) ||
+            event.source !== 'household')) ||
         (event.payer === 'household' && event.source !== 'household') ||
         typeof event.category !== 'string' ||
         !event.category.trim() ||
@@ -158,6 +172,9 @@ export function validateLedger(events: LedgerEvent[]): void {
         throw new Error('Expense shares do not match the split.');
     } else if (event.kind === 'settlement') {
       if (
+        (event.fund !== undefined &&
+          (!['operating', 'savings'].includes(event.fund) ||
+            (event.from !== 'household' && event.to !== 'household'))) ||
         !PARTIES.includes(event.from) ||
         !PARTIES.includes(event.to) ||
         event.from === event.to ||
@@ -167,6 +184,19 @@ export function validateLedger(events: LedgerEvent[]): void {
       )
         throw new Error(
           'Choose different settlement parties and a positive amount.',
+        );
+    } else if (event.kind === 'fund-movement') {
+      if (
+        !['operating', 'savings'].includes(event.from) ||
+        !['operating', 'savings', 'external'].includes(event.to) ||
+        event.from === event.to ||
+        !positive(event.amountMinor) ||
+        typeof event.note !== 'string' ||
+        !event.note.trim() ||
+        event.note.length > 200
+      )
+        throw new Error(
+          'Choose different funds, a positive amount and a description.',
         );
     } else if (event.kind === 'reversal') {
       if (
@@ -226,14 +256,14 @@ export function validateLedger(events: LedgerEvent[]): void {
 export function activeEntries(
   events: LedgerEvent[],
   through = '2100-12-31',
-): (PostedExpense | DebtSettlement)[] {
+): (PostedExpense | DebtSettlement | FundMovement)[] {
   const reversed = new Set(
     events
       .filter((e) => e.kind === 'reversal' && e.date <= through)
       .map((e) => (e.kind === 'reversal' ? e.targetId : '')),
   );
   return events.filter(
-    (event): event is PostedExpense | DebtSettlement =>
+    (event): event is PostedExpense | DebtSettlement | FundMovement =>
       event.kind !== 'reversal' &&
       event.date <= through &&
       !reversed.has(event.id),
@@ -250,7 +280,7 @@ export function netBalances(events: LedgerEvent[]): Record<Party, number> {
       PARTIES.forEach((party, i) => {
         balances[party] -= event.shares[i];
       });
-    } else {
+    } else if (event.kind === 'settlement') {
       balances[event.from] += event.amountMinor;
       balances[event.to] -= event.amountMinor;
     }
@@ -289,7 +319,7 @@ export function settlementLimit(
       const payer = effectivePayer(entry);
       if (payer === to) direct += entry.shares[PARTIES.indexOf(from)];
       if (payer === from) direct -= entry.shares[PARTIES.indexOf(to)];
-    } else {
+    } else if (entry.kind === 'settlement') {
       if (entry.from === from && entry.to === to) direct -= entry.amountMinor;
       if (entry.from === to && entry.to === from) direct += entry.amountMinor;
     }
@@ -336,18 +366,21 @@ export function appendEntries(
 export function recordedFunds(doc: HouseholdPlan, month: string) {
   const [year, index] = month.split('-').map(Number);
   const through = `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`;
-  let operatingMinor = doc.transfers
-    .filter((t) => t.month <= month)
-    .reduce((sum, t) => sum + t.operatingMinor, 0);
-  const savingsMinor = doc.transfers
-    .filter((t) => t.month <= month)
-    .reduce((sum, t) => sum + t.savingsMinor, 0);
+  const totals = { operating: 0, savings: 0 };
+  for (const transfer of doc.transfers.filter((t) => t.month <= month))
+    totals[transfer.fund] += transfer.amountMinor;
   for (const event of activeEntries(doc.ledger, through)) {
     if (event.kind === 'expense' && effectivePayer(event) === 'household')
-      operatingMinor -= event.amountMinor;
+      totals[event.fund ?? 'operating'] -= event.amountMinor;
     if (event.kind === 'settlement') {
-      if (event.from === 'household') operatingMinor -= event.amountMinor;
-      if (event.to === 'household') operatingMinor += event.amountMinor;
+      if (event.from === 'household')
+        totals[event.fund ?? 'operating'] -= event.amountMinor;
+      if (event.to === 'household')
+        totals[event.fund ?? 'operating'] += event.amountMinor;
+    }
+    if (event.kind === 'fund-movement') {
+      totals[event.from] -= event.amountMinor;
+      if (event.to !== 'external') totals[event.to] += event.amountMinor;
     }
   }
   const householdPayables = Math.max(
@@ -355,11 +388,35 @@ export function recordedFunds(doc: HouseholdPlan, month: string) {
     -netBalances(doc.ledger.filter((e) => e.date <= through)).household,
   );
   return {
-    operatingMinor,
-    savingsMinor,
+    operatingMinor: totals.operating,
+    savingsMinor: totals.savings,
     householdPayables,
-    unencumberedMinor: operatingMinor - householdPayables,
+    unencumberedMinor: totals.operating - householdPayables,
   };
+}
+// Signed contribution to the selected member's net balance; repayments show debt reduction.
+export function memberImpact(
+  event: LedgerEvent,
+  member: 'a' | 'b',
+  events: LedgerEvent[],
+): number {
+  if (event.kind === 'reversal') {
+    const original = events.find((e) => e.id === event.targetId);
+    return original && original.kind !== 'reversal'
+      ? -memberImpact(original, member, events)
+      : 0;
+  }
+  if (event.kind === 'expense')
+    return (
+      (effectivePayer(event) === member ? event.amountMinor : 0) -
+      event.shares[PARTIES.indexOf(member)]
+    );
+  if (event.kind === 'settlement')
+    return (
+      (event.from === member ? event.amountMinor : 0) -
+      (event.to === member ? event.amountMinor : 0)
+    );
+  return 0;
 }
 export function categorySpending(doc: HouseholdPlan, from: string, to: string) {
   const totals = new Map<string, number>();

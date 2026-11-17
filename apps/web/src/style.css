@@ -1573,3 +1573,140 @@ select {
     flex-wrap: wrap;
   }
 }
+
+:root {
+  --balance-positive: #37dbea;
+  --balance-negative: #ffb546;
+}
+.signed-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.signed-amount.positive {
+  color: var(--balance-positive);
+}
+.signed-amount.negative {
+  color: var(--balance-negative);
+}
+.signed-amount.neutral {
+  color: var(--muted);
+}
+:root[data-theme='light'] .signed-amount:not(.neutral) {
+  background: #12142a;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+.fund-confirmations {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+.fund-check {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 48px;
+  min-width: 0;
+  padding: 4px 0;
+  font-size: 11px;
+  text-align: left;
+}
+.fund-check svg {
+  flex-shrink: 0;
+}
+.fund-check span {
+  overflow-wrap: anywhere;
+}
+.fund-check:disabled {
+  opacity: 1;
+}
+.fund-check.complete svg {
+  color: var(--balance-positive);
+}
+.fund-check:not(:disabled):hover {
+  color: var(--text);
+}
+:root[data-theme='light'] .fund-check.complete svg {
+  background: #12142a;
+  border-radius: 3px;
+}
+.advanced-options > summary,
+.history-filter-options > summary,
+.entry-details > summary {
+  min-height: 48px;
+  padding-block: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.advanced-fields {
+  display: grid;
+  gap: 14px;
+  padding-block: 8px;
+}
+.advanced-fields .input-row {
+  align-items: start;
+}
+.ledger-editor label > input {
+  margin-top: 0;
+}
+.activity-row {
+  display: block;
+  padding-block: 10px 0;
+}
+.activity-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-top: 4px;
+}
+.activity-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 550;
+}
+.entry-detail-content {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  padding-bottom: 12px;
+  line-height: 1.5;
+}
+.reversed-entry .activity-title {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+.personal-balance {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.fund-activity {
+  margin-top: 16px;
+}
+.fund-activity > summary {
+  min-height: 48px;
+  padding-block: 14px;
+  font-weight: 600;
+}
+.fund-activity > .muted {
+  margin-top: 12px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

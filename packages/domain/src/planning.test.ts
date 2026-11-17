@@ -150,3 +150,93 @@ describe('trust-based transfer confirmations', () => {
     expect(monthlyPlan(changed, '2030-01').confirmedSavingsMinor).toBe(10000);
   });
 });
+
+describe('independent fund confirmations and legacy upgrades', () => {
+  it('confirms operating and savings independently and keeps amounts frozen after plan changes', async () => {
+    const { confirmFundTransfer, fundingStatus } = await import('./index');
+    let doc = confirmFundTransfer(
+      household(),
+      '2030-01',
+      0,
+      'operating',
+      '2030-01-01T12:00:00Z',
+    );
+    expect(monthlyPlan(doc, '2030-01').confirmedOperatingMinor).toBe(40000);
+    expect(monthlyPlan(doc, '2030-01').confirmedSavingsMinor).toBe(0);
+    expect(fundingStatus(doc, '2030-01', 0, 'operating').complete).toBe(true);
+    expect(fundingStatus(doc, '2030-01', 0, 'savings').complete).toBe(false);
+    expect(() =>
+      confirmFundTransfer(
+        doc,
+        '2030-01',
+        0,
+        'operating',
+        '2030-01-02T12:00:00Z',
+      ),
+    ).toThrow('already confirmed');
+    doc = confirmFundTransfer(
+      { ...doc, savingsTargets: [{ month: '2030-01', amountMinor: 30000 }] },
+      '2030-01',
+      0,
+      'savings',
+      '2030-01-03T12:00:00Z',
+    );
+    expect(monthlyPlan(doc, '2030-01').confirmedOperatingMinor).toBe(40000);
+    expect(monthlyPlan(doc, '2030-01').confirmedSavingsMinor).toBe(15000);
+  });
+  it('automatically satisfies a zero responsibility without inventing money or a declaration', async () => {
+    const { fundingStatus, confirmFundTransfer } = await import('./index');
+    const doc = {
+      ...initialHousehold(),
+      savingsTargets: [{ month: '2030-01', amountMinor: 1 }],
+    };
+    expect(fundingStatus(doc, '2030-01', 0, 'savings')).toMatchObject({
+      complete: true,
+      notRequired: true,
+      target: 0,
+    });
+    expect(fundingStatus(doc, '2030-01', 1, 'savings').complete).toBe(false);
+    expect(() =>
+      confirmFundTransfer(doc, '2030-01', 0, 'savings', '2030-01-01T12:00:00Z'),
+    ).toThrow('No transfer');
+    expect(doc.transfers).toEqual([]);
+  });
+  it('migrates v2/v3 combined declarations and rejects malformed legacy history', async () => {
+    const { upgradeHousehold } = await import('./index');
+    const old = {
+      ...initialHousehold(),
+      schemaVersion: 3,
+      transfers: [
+        {
+          id: '2030-01:0',
+          month: '2030-01',
+          member: 0,
+          operatingMinor: 40000,
+          savingsMinor: 10000,
+          confirmedAt: '2030-01-01T12:00:00Z',
+        },
+      ],
+    };
+    const migrated = upgradeHousehold(old);
+    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.transfers.map((t) => [t.fund, t.amountMinor])).toEqual([
+      ['operating', 40000],
+      ['savings', 10000],
+    ]);
+    expect(monthlyPlan(migrated, '2030-01').confirmedOperatingMinor).toBe(
+      40000,
+    );
+    expect(() =>
+      upgradeHousehold({
+        ...old,
+        transfers: [...old.transfers, ...old.transfers],
+      }),
+    ).toThrow('legacy');
+    expect(() =>
+      upgradeHousehold({
+        ...old,
+        transfers: [{ ...old.transfers[0], savingsMinor: -1 }],
+      }),
+    ).toThrow();
+  });
+});

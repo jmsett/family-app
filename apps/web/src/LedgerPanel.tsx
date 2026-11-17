@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   appendEntries,
   categorySpending,
+  memberImpact,
   EXPENSE_CATEGORIES,
   netBalances,
   parseMoney,
@@ -15,6 +16,7 @@ import {
 } from '@family/domain';
 import type {
   DebtSettlement,
+  Fund,
   HouseholdPlan,
   LedgerEvent,
   Party,
@@ -22,6 +24,7 @@ import type {
   Shares,
   SplitMode,
 } from '@family/shared';
+import { SignedMoney } from './SignedMoney';
 import { ProgressBar } from './ProgressBar';
 const money = (value: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(
@@ -58,6 +61,8 @@ function ExpenseEditor({
   const [source, setSource] = useState<'personal' | 'household'>(
     original?.source ?? 'personal',
   );
+  const [fund, setFund] = useState<Fund>(original?.fund ?? 'operating');
+  const [advanced, setAdvanced] = useState(!!original);
   const [mode, setMode] = useState<SplitMode>(original?.splitMode ?? 'equal');
   const [selected, setSelected] = useState<boolean[]>(
     original ? original.splitInput.map((v) => v > 0) : [true, true, false],
@@ -69,8 +74,7 @@ function ExpenseEditor({
         )
       : ['50', '50', '0'],
   );
-  const [preset, setPreset] = useState(original ? 'custom' : 'equal'),
-    [debtor, setDebtor] = useState<Party>(actor === 'a' ? 'b' : 'a');
+  const [preset, setPreset] = useState(original ? 'custom' : 'equal');
   const [category, setCategory] = useState(original?.category ?? 'Food'),
     [customCategory, setCustomCategory] = useState('');
   const [labels, setLabels] = useState(original?.labels.join(', ') ?? ''),
@@ -108,6 +112,7 @@ function ExpenseEditor({
       date,
       payer,
       source,
+      ...(source === 'household' ? { fund } : {}),
       splitMode: mode,
       splitInput,
       shares,
@@ -128,15 +133,26 @@ function ExpenseEditor({
     validation = (error as Error).message;
     candidate = null;
   }
+  const other = actor === 'a' ? 'b' : 'a';
   function setup(value: string) {
     setPreset(value);
+    if (value === 'custom') {
+      setAdvanced(true);
+      return;
+    }
+    const perspective = value.startsWith('other-') ? other : actor;
+    const kind = value.replace('other-', '');
     setMode('equal');
-    setSource(value === 'household' ? 'household' : 'personal');
-    setPayer(value === 'household' ? 'household' : actor);
-    if (value === 'equal') setSelected([true, true, false]);
-    if (value === 'advance' || value === 'household')
-      setSelected([false, false, true]);
-    if (value === 'full') setSelected(PARTIES.map((p) => p === debtor));
+    setFund('operating');
+    setSource(kind === 'household' ? 'household' : 'personal');
+    setPayer(kind === 'household' ? 'household' : perspective);
+    setSelected(
+      kind === 'equal'
+        ? [true, true, false]
+        : kind === 'full'
+          ? PARTIES.map((p) => p !== 'household' && p !== perspective)
+          : [false, false, true],
+    );
   }
   function changeMode(next: SplitMode) {
     const shares = candidate?.shares ?? [0, 0, 0];
@@ -186,28 +202,36 @@ function ExpenseEditor({
     >
       <fieldset disabled={disabled}>
         <h3>{original ? 'Correct expense' : 'Add expense'}</h3>
-        {!original && (
-          <label>
-            Quick setup
-            <select
-              aria-label="Expense quick setup"
-              value={preset}
-              onChange={(e) => setup(e.target.value)}
-            >
-              <option value="equal">
-                {partyName(document, actor)} paid, split equally
-              </option>
-              <option value="full">
-                {partyName(document, actor)} is owed the full amount
-              </option>
-              <option value="advance">
-                {partyName(document, actor)} paid for the household
-              </option>
-              <option value="household">Household paid</option>
-              <option value="custom">Custom split</option>
-            </select>
-          </label>
-        )}
+        <label>
+          Quick setup
+          <select
+            aria-label="Expense quick setup"
+            value={preset}
+            onChange={(e) => setup(e.target.value)}
+          >
+            {[
+              ['', actor],
+              ['other-', other],
+            ].map(([prefix, person]) => (
+              <optgroup
+                key={person}
+                label={partyName(document, person as Party)}
+              >
+                <option value={`${prefix}equal`}>
+                  {partyName(document, person as Party)} paid, split equally
+                </option>
+                <option value={`${prefix}full`}>
+                  {partyName(document, person as Party)} is owed the full amount
+                </option>
+                <option value={`${prefix}advance`}>
+                  {partyName(document, person as Party)} paid for the household
+                </option>
+              </optgroup>
+            ))}
+            <option value="household">Household paid</option>
+            <option value="custom">Custom — advanced options</option>
+          </select>
+        </label>
         <label>
           Description
           <input
@@ -218,143 +242,16 @@ function ExpenseEditor({
             required
           />
         </label>
-        <div className="input-row">
-          <label>
-            Amount (€)
-            <input
-              aria-label="Expense amount"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Payment date
-            <input
-              aria-label="Expense date"
-              type="date"
-              min="2000-01-01"
-              max={today}
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </label>
-        </div>
-        <div className="input-row">
-          <label>
-            Paid by
-            <select
-              aria-label="Expense payer"
-              value={payer}
-              onChange={(e) => {
-                const value = e.target.value as Party;
-                setPayer(value);
-                setSource(value === 'household' ? 'household' : 'personal');
-                setPreset('custom');
-              }}
-            >
-              {PARTIES.map((p) => (
-                <option key={p} value={p}>
-                  {partyName(document, p)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Funding source
-            <select
-              aria-label="Expense funding source"
-              value={source}
-              disabled={payer === 'household'}
-              onChange={(e) => setSource(e.target.value as typeof source)}
-            >
-              <option value="personal">Personal funds</option>
-              <option value="household">Household funds</option>
-            </select>
-          </label>
-        </div>
-        <p className="muted">
-          Personal money advanced for the household creates a debt. Existing
-          household funds do not create another reimbursement.
-        </p>
-        {preset === 'full' && (
-          <label>
-            Who owes the full amount?
-            <select
-              aria-label="Full amount debtor"
-              value={debtor}
-              onChange={(e) => {
-                const value = e.target.value as Party;
-                setDebtor(value);
-                setSelected(PARTIES.map((p) => p === value));
-              }}
-            >
-              {PARTIES.filter((p) => p !== actor).map((p) => (
-                <option key={p} value={p}>
-                  {partyName(document, p)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
         <label>
-          Split method
-          <select
-            aria-label="Split method"
-            value={mode}
-            onChange={(e) => changeMode(e.target.value as SplitMode)}
-          >
-            <option value="equal">Equally</option>
-            <option value="amount">Unequally by amount</option>
-            <option value="percentage">By percentage</option>
-          </select>
+          Amount (€)
+          <input
+            aria-label="Expense amount"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+          />
         </label>
-        <div className="split-rows" aria-label="Expense beneficiaries">
-          {PARTIES.map((party, i) => (
-            <div className="split-row" key={party}>
-              {mode === 'equal' ? (
-                <label className="beneficiary-check">
-                  <input
-                    type="checkbox"
-                    aria-label={`Include ${partyName(document, party)}`}
-                    checked={selected[i]}
-                    onChange={(e) => {
-                      const next = [...selected];
-                      next[i] = e.target.checked;
-                      setSelected(next);
-                      setPreset('custom');
-                    }}
-                  />
-                  {partyName(document, party)}
-                </label>
-              ) : (
-                <label>
-                  {partyName(document, party)}
-                  <input
-                    aria-label={`${partyName(document, party)} ${mode === 'amount' ? 'split amount' : 'split percentage'}`}
-                    inputMode="decimal"
-                    value={values[i]}
-                    onChange={(e) => {
-                      const next = [...values];
-                      next[i] = e.target.value;
-                      setValues(next);
-                    }}
-                  />
-                </label>
-              )}
-              <span>
-                {mode === 'percentage' ? '% · ' : ''}
-                {candidate ? money(candidate.shares[i]) : '—'}
-              </span>
-            </div>
-          ))}
-        </div>
-        <p className="muted">
-          Use Household for shared household costs; choose people for personal
-          splits.
-        </p>
         <label>
           Category
           <select
@@ -390,18 +287,148 @@ function ExpenseEditor({
             onChange={(e) => setLabels(e.target.value)}
           />
         </label>
-        {original && (
-          <label>
-            Correction reason
-            <input
-              aria-label="Correction reason"
-              maxLength={200}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              required
-            />
-          </label>
-        )}
+        <details
+          className="advanced-options"
+          open={advanced}
+          onToggle={(e) => setAdvanced(e.currentTarget.open)}
+        >
+          <summary>Advanced options</summary>
+          <div className="advanced-fields">
+            <label>
+              Payment date
+              <input
+                aria-label="Expense date"
+                type="date"
+                min="2000-01-01"
+                max={today}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </label>
+            <div className="input-row">
+              <label>
+                Paid by
+                <select
+                  aria-label="Expense payer"
+                  value={payer}
+                  onChange={(e) => {
+                    const value = e.target.value as Party;
+                    setPayer(value);
+                    setSource(value === 'household' ? 'household' : 'personal');
+                    setPreset('custom');
+                  }}
+                >
+                  {PARTIES.map((p) => (
+                    <option key={p} value={p}>
+                      {partyName(document, p)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Funding source
+                <select
+                  aria-label="Expense funding source"
+                  value={source}
+                  disabled={payer === 'household'}
+                  onChange={(e) => {
+                    setSource(e.target.value as typeof source);
+                    setPreset('custom');
+                  }}
+                >
+                  <option value="personal">Personal funds</option>
+                  <option value="household">Household funds</option>
+                </select>
+              </label>
+            </div>
+            {source === 'household' && (
+              <label>
+                Pay from
+                <select
+                  aria-label="Expense fund"
+                  value={fund}
+                  onChange={(e) => setFund(e.target.value as Fund)}
+                >
+                  <option value="operating">Operating funds</option>
+                  <option value="savings">Savings funds</option>
+                </select>
+              </label>
+            )}
+            <p className="muted">
+              Personal money advanced for the household creates a debt. Existing
+              household funds do not create another reimbursement.
+            </p>
+            <label>
+              Split method
+              <select
+                aria-label="Split method"
+                value={mode}
+                onChange={(e) => changeMode(e.target.value as SplitMode)}
+              >
+                <option value="equal">Equally</option>
+                <option value="amount">Unequally by amount</option>
+                <option value="percentage">By percentage</option>
+              </select>
+            </label>
+            <div className="split-rows" aria-label="Expense beneficiaries">
+              {PARTIES.map((party, i) => (
+                <div className="split-row" key={party}>
+                  {mode === 'equal' ? (
+                    <label className="beneficiary-check">
+                      <input
+                        type="checkbox"
+                        aria-label={`Include ${partyName(document, party)}`}
+                        checked={selected[i]}
+                        onChange={(e) => {
+                          const next = [...selected];
+                          next[i] = e.target.checked;
+                          setSelected(next);
+                          setPreset('custom');
+                        }}
+                      />
+                      {partyName(document, party)}
+                    </label>
+                  ) : (
+                    <label>
+                      {partyName(document, party)}
+                      <input
+                        aria-label={`${partyName(document, party)} ${mode === 'amount' ? 'split amount' : 'split percentage'}`}
+                        inputMode="decimal"
+                        value={values[i]}
+                        onChange={(e) => {
+                          const next = [...values];
+                          next[i] = e.target.value;
+                          setValues(next);
+                        }}
+                      />
+                    </label>
+                  )}
+                  <span>
+                    {mode === 'percentage' ? '% · ' : ''}
+                    {candidate ? money(candidate.shares[i]) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="muted">
+              Use Household for shared household costs; choose people for
+              personal splits.
+            </p>
+            {original && (
+              <label>
+                Correction reason
+                <input
+                  aria-label="Correction reason"
+                  maxLength={200}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  required
+                />
+              </label>
+            )}
+          </div>
+        </details>
         {(error || (amount && validation)) && (
           <p className="validation" role="alert">
             {error || validation}
@@ -443,6 +470,7 @@ function SettlementEditor({
     [date, setDate] = useState(today),
     [note, setNote] = useState(''),
     [error, setError] = useState('');
+  const [fund, setFund] = useState<Fund>('operating');
   const limit = settlementLimit(document.ledger, from, to);
   let candidate: DebtSettlement | null = null,
     validation = '';
@@ -451,6 +479,7 @@ function SettlementEditor({
     candidate = {
       id,
       kind: 'settlement',
+      ...(from === 'household' || to === 'household' ? { fund } : {}),
       from,
       to,
       amountMinor,
@@ -560,6 +589,22 @@ function SettlementEditor({
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
+        {(from === 'household' || to === 'household') && (
+          <details className="advanced-options">
+            <summary>Advanced options</summary>
+            <label>
+              Household account
+              <select
+                aria-label="Settlement household fund"
+                value={fund}
+                onChange={(e) => setFund(e.target.value as Fund)}
+              >
+                <option value="operating">Operating</option>
+                <option value="savings">Savings</option>
+              </select>
+            </label>
+          </details>
+        )}
         {(error || (amount && validation)) && (
           <p className="validation" role="alert">
             {error || validation}
@@ -624,7 +669,12 @@ function ReversalEditor({
     >
       <fieldset disabled={disabled}>
         <h3>
-          Reverse recorded {target.kind === 'expense' ? 'expense' : 'payment'}
+          Reverse recorded{' '}
+          {target.kind === 'expense'
+            ? 'expense'
+            : target.kind === 'fund-movement'
+              ? 'fund movement'
+              : 'payment'}
         </h3>
         <p className="muted">
           The original stays in history. Its effect is reversed in its original
@@ -740,7 +790,9 @@ export function LedgerPanel({
           original.shares[PARTIES.indexOf(party)] > 0
         : original.kind === 'settlement'
           ? original.from === party || original.to === party
-          : false);
+          : original.kind === 'fund-movement'
+            ? party === 'household'
+            : false);
     return (
       partyMatch &&
       (filterCategory === 'all' ||
@@ -774,12 +826,14 @@ export function LedgerPanel({
         close: () => setEditor(null),
       }
     : null;
-  const label = (event: LedgerEvent): string =>
-    event.kind === 'expense'
-      ? event.description
-      : event.kind === 'settlement'
-        ? `${partyName(document, event.from)} → ${partyName(document, event.to)}`
-        : `Reversal: ${document.ledger.find((e) => e.id === event.targetId)?.kind === 'expense' ? (document.ledger.find((e) => e.id === event.targetId) as PostedExpense).description : 'repayment'}`;
+  const label = (event: LedgerEvent): string => {
+    if (event.kind === 'expense') return event.description;
+    if (event.kind === 'settlement')
+      return `Payment: ${partyName(document, event.from)} → ${partyName(document, event.to)}`;
+    if (event.kind === 'fund-movement') return event.note;
+    const target = document.ledger.find((e) => e.id === event.targetId);
+    return `Reversal: ${target?.kind === 'expense' ? target.description : target?.kind === 'fund-movement' ? target.note : 'repayment'}`;
+  };
   return (
     <section
       ref={panel}
@@ -790,29 +844,21 @@ export function LedgerPanel({
         <h2>Balances &amp; settlements</h2>
         <span className="subtle-label">All dates</span>
       </div>
-      <p className="muted">
-        Outstanding debts carry across months. Positive balances are owed money.
-      </p>
       {member && (
         <p className="personal-balance" data-testid="personal-balance">
-          {balances[member] < 0
-            ? `You owe ${money(-balances[member])} net`
-            : balances[member] > 0
-              ? `You’re owed ${money(balances[member])} net`
-              : 'Your net balance is settled.'}
+          Your balance{' '}
+          <SignedMoney value={balances[member]} label="Your net balance" />
         </p>
       )}
       <div className="balance-rows">
         {PARTIES.map((p) => (
           <div className="balance-row" key={p}>
             <span>{partyName(document, p)}</span>
-            <strong data-testid={`balance-${p}`}>
-              {balances[p] > 0
-                ? `Owed ${money(balances[p])}`
-                : balances[p] < 0
-                  ? `Owes ${money(-balances[p])}`
-                  : 'Settled'}
-            </strong>
+            <SignedMoney
+              testId={`balance-${p}`}
+              value={balances[p]}
+              label={`${partyName(document, p)} net balance`}
+            />
           </div>
         ))}
       </div>
@@ -886,68 +932,93 @@ export function LedgerPanel({
         <summary>
           Expenses &amp; payment history ({document.ledger.length})
         </summary>
-        <div className="history-filters">
-          <div className="input-row">
-            <label>
-              From date
-              <input
-                aria-label="History from date"
-                type="date"
-                min="2000-01-01"
-                max="2100-12-31"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-              />
-            </label>
-            <label>
-              To date
-              <input
-                aria-label="History to date"
-                type="date"
-                min="2000-01-01"
-                max="2100-12-31"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-              />
-            </label>
+        <details className="history-filter-options">
+          <summary>
+            Filters
+            {filterParty !== 'all' ||
+            filterCategory !== 'all' ||
+            fromDate !== `${month}-01` ||
+            toDate !==
+              `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`
+              ? ' · active'
+              : ''}
+          </summary>
+          <div className="history-filters">
+            <div className="input-row">
+              <label>
+                From date
+                <input
+                  aria-label="History from date"
+                  type="date"
+                  min="2000-01-01"
+                  max="2100-12-31"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                />
+              </label>
+              <label>
+                To date
+                <input
+                  aria-label="History to date"
+                  type="date"
+                  min="2000-01-01"
+                  max="2100-12-31"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="input-row">
+              <label>
+                Person / household
+                <select
+                  aria-label="History party"
+                  value={filterParty}
+                  onChange={(e) => setFilterParty(e.target.value)}
+                >
+                  <option value="all">Everyone</option>
+                  {PARTIES.map((p) => (
+                    <option key={p} value={p}>
+                      {partyName(document, p)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Category
+                <select
+                  aria-label="History category"
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                >
+                  <option value="all">All categories</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="muted">
+              Filters affect history and spending charts, not outstanding
+              balances.
+            </p>
           </div>
-          <div className="input-row">
-            <label>
-              Person / household
-              <select
-                aria-label="History party"
-                value={filterParty}
-                onChange={(e) => setFilterParty(e.target.value)}
-              >
-                <option value="all">Everyone</option>
-                {PARTIES.map((p) => (
-                  <option key={p} value={p}>
-                    {partyName(document, p)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Category
-              <select
-                aria-label="History category"
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-              >
-                <option value="all">All categories</option>
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <p className="muted">
-            Filters affect history and spending charts, not outstanding
-            balances.
-          </p>
-        </div>
+          <button
+            className="text-button"
+            onClick={() => {
+              setFromDate(`${month}-01`);
+              setToDate(
+                `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`,
+              );
+              setFilterParty('all');
+              setFilterCategory('all');
+            }}
+          >
+            Reset filters
+          </button>
+        </details>
         {fromDate > toDate && (
           <p className="validation" role="alert">
             From date must not follow To date.
@@ -960,71 +1031,112 @@ export function LedgerPanel({
               key={event.id}
               aria-label={`${event.kind}: ${label(event)}`}
             >
-              <div>
-                <strong>{label(event)}</strong>
-                <small>
-                  {event.date} ·{' '}
-                  {event.kind === 'expense'
-                    ? `${partyName(document, event.payer)} paid · ${event.source === 'household' ? 'household funds' : 'personal funds'} · ${event.category}`
-                    : event.kind === 'settlement'
-                      ? 'Repayment'
-                      : event.reason}
-                  {reversed.has(event.id) ? ' · Reversed' : ''}
-                </small>
-                <small>
-                  Recorded by {partyName(document, event.actor)} ·{' '}
-                  {event.createdAt.slice(0, 10)}
-                </small>
-                {event.kind === 'expense' && (
-                  <small>
-                    {event.splitMode === 'equal'
-                      ? 'Equal split'
-                      : event.splitMode === 'percentage'
-                        ? 'Percentage split'
-                        : 'Exact amounts'}{' '}
-                    ·{' '}
-                    {PARTIES.filter((_, i) => event.shares[i] > 0)
-                      .map(
-                        (p) =>
-                          `${partyName(document, p)} ${money(event.shares[PARTIES.indexOf(p)])}`,
-                      )
-                      .join(' · ')}
-                  </small>
-                )}
-                {event.kind === 'expense' && event.labels.length > 0 && (
-                  <small>{event.labels.join(' · ')}</small>
-                )}
-                {event.kind === 'settlement' && event.note && (
-                  <small>{event.note}</small>
+              <div className="activity-summary">
+                <strong className="activity-title">{label(event)}</strong>
+                {member ? (
+                  <SignedMoney
+                    value={memberImpact(event, member, document.ledger)}
+                    label="Effect on your net balance"
+                  />
+                ) : (
+                  <span className="muted">Choose identity</span>
                 )}
               </div>
-              <div className="activity-actions">
-                {event.kind !== 'reversal' && (
-                  <strong>{money(event.amountMinor)}</strong>
-                )}
-                {!reversed.has(event.id) && event.kind !== 'reversal' && (
-                  <div>
-                    {event.kind === 'expense' && (
+              <details className="entry-details">
+                <summary>Details</summary>
+                <div className="entry-detail-content">
+                  <p>
+                    {event.date}
+                    {reversed.has(event.id) ? ' · Reversed' : ''}
+                  </p>
+                  <p>
+                    Recorded by {partyName(document, event.actor)} ·{' '}
+                    {new Date(event.createdAt).toLocaleString()}
+                  </p>
+                  {event.kind === 'expense' && (
+                    <>
+                      <p>
+                        Full expense: {money(event.amountMinor)} ·{' '}
+                        {partyName(document, event.payer)} paid ·{' '}
+                        {event.source === 'household'
+                          ? `${event.fund ?? 'operating'} funds`
+                          : 'personal funds'}
+                      </p>
+                      <p>
+                        {event.category}
+                        {event.labels.length
+                          ? ` · ${event.labels.join(' · ')}`
+                          : ''}
+                      </p>
+                      <p>
+                        {event.splitMode === 'equal'
+                          ? 'Equal split'
+                          : event.splitMode === 'percentage'
+                            ? 'Percentage split'
+                            : 'Exact amounts'}{' '}
+                        ·{' '}
+                        {PARTIES.filter((_, i) => event.shares[i] > 0)
+                          .map(
+                            (p) =>
+                              `${partyName(document, p)} ${money(event.shares[PARTIES.indexOf(p)])}`,
+                          )
+                          .join(' · ')}
+                      </p>
+                      <p>
+                        The row shows the original effect on your balance.
+                        Outstanding debt is shown above after repayments.
+                      </p>
+                    </>
+                  )}
+                  {event.kind === 'settlement' && (
+                    <>
+                      <p>
+                        Payment: {money(event.amountMinor)}
+                        {event.note ? ` · ${event.note}` : ''}
+                        {event.from === 'household' || event.to === 'household'
+                          ? ` · ${event.fund ?? 'operating'} account`
+                          : ''}
+                      </p>
+                      <p>
+                        The signed amount shows debt reduction, not income or
+                        spending.
+                      </p>
+                    </>
+                  )}
+                  {event.kind === 'fund-movement' && (
+                    <p>
+                      {event.from} →{' '}
+                      {event.to === 'external'
+                        ? 'outside tracked funds'
+                        : event.to}
+                      : {money(event.amountMinor)} · no effect on personal debt
+                    </p>
+                  )}
+                  {event.kind === 'reversal' && <p>{event.reason}</p>}
+                  {!reversed.has(event.id) && event.kind !== 'reversal' && (
+                    <div className="entry-actions">
+                      {event.kind === 'expense' && (
+                        <button
+                          className="text-button"
+                          disabled={disabled || editor !== null}
+                          onClick={() =>
+                            edit({ type: 'expense', original: event })
+                          }
+                        >
+                          Correct
+                        </button>
+                      )}
                       <button
                         className="text-button"
                         disabled={disabled || editor !== null}
-                        onClick={() =>
-                          edit({ type: 'expense', original: event })
-                        }
+                        onClick={() => edit({ type: 'reverse', target: event })}
                       >
-                        Correct
+                        Reverse
                       </button>
-                    )}
-                    <button
-                      className="text-button"
-                      disabled={disabled || editor !== null}
-                      onClick={() => edit({ type: 'reverse', target: event })}
-                    >
-                      Reverse
-                    </button>
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
+                </div>
+              </details>
             </article>
           ))
         ) : (
@@ -1033,14 +1145,9 @@ export function LedgerPanel({
       </details>
       <details className="activity-details">
         <summary>Spending by category</summary>
-        <p className="muted">
-          Actual purchases from {fromDate} to {toDate}. Recurring forecasts and
-          repayments are excluded.
-        </p>
-        <p className="chart-total">
-          Total:{' '}
-          <strong data-testid="actual-spending-total">{money(total)}</strong>
-        </p>
+        <span className="sr-only" data-testid="actual-spending-total">
+          {money(total)}
+        </span>
         {spending.map((row) => {
           const known = EXPENSE_CATEGORIES.indexOf(row.category);
           const colorIndex =

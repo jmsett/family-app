@@ -64,9 +64,26 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await page.getByLabel('Expense description').fill('Offline purchase');
   await page.getByLabel('Expense amount', { exact: true }).fill('20');
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
-  await expect(page.getByTestId('balance-b')).toHaveText('Owed €10.00');
+  await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
   await page.reload();
-  await expect(page.getByTestId('balance-b')).toHaveText('Owed €10.00');
+  await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
+  await page.getByText('Fund activity', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Move or withdraw funds', exact: true })
+    .click();
+  await page.getByLabel('Fund movement amount').fill('20');
+  await page
+    .getByLabel('Fund movement description')
+    .fill('Offline savings transfer');
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Record movement', exact: true })
+    .click();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€180.00');
+  await expect(page.getByTestId('operating-funds')).toHaveText('€20.00');
+  await page.reload();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€180.00');
+  await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -227,7 +244,7 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await expect(status(page)).toContainText('Synced with');
   for (const device of [page, second]) {
     await navigate(device, 'Overview');
-    await expect(device.getByTestId('balance-a')).toHaveText('Owed €5.00');
+    await expect(device.getByTestId('balance-a')).toHaveText('+€5.00');
     await device.getByText('Spending by category', { exact: true }).click();
     await expect(device.getByTestId('actual-spending-total')).toHaveText(
       '€30.00',
@@ -239,7 +256,7 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await page
     .getByRole('button', { name: 'Record payment', exact: true })
     .click();
-  await expect(page.getByTestId('balance-a')).toHaveText('Settled');
+  await expect(page.getByTestId('balance-a')).toHaveText('€0.00');
   await context.setOffline(false);
   await navigate(page, 'Settings');
   await page.getByRole('button', { name: 'Sync now' }).click();
@@ -248,12 +265,39 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await second.getByRole('button', { name: 'Sync now' }).click();
   await expect(status(second)).toContainText('Synced with');
   await navigate(second, 'Overview');
-  await expect(second.getByTestId('balance-a')).toHaveText('Settled');
+  await expect(second.getByTestId('balance-a')).toHaveText('€0.00');
+  // A dated offline movement changes the accounts on both devices, never spending/debt.
+  await navigate(page, 'Overview');
+  await context.setOffline(true);
+  await page.getByText('Fund activity', { exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Move or withdraw funds', exact: true })
+    .click();
+  await page.getByLabel('Fund movement amount').fill('20');
+  await page
+    .getByLabel('Fund movement description')
+    .fill('Offline fund movement');
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Record movement', exact: true })
+    .click();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€230.00');
+  await context.setOffline(false);
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Overview');
+  await expect(second.getByTestId('savings-funds')).toHaveText('€230.00');
+  await expect(second.getByTestId('operating-funds')).toHaveText('€20.00');
+  await expect(second.getByTestId('balance-a')).toHaveText('€0.00');
   const uploaded = JSON.parse(
     Buffer.from(remote!.content, 'base64').toString('utf8'),
   );
-  expect(uploaded.ledger).toHaveLength(3);
-  expect(uploaded.schemaVersion).toBe(3);
+  expect(uploaded.ledger).toHaveLength(4);
+  expect(uploaded.schemaVersion).toBe(4);
   await secondContext.close();
 });
 

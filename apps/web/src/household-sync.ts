@@ -46,11 +46,7 @@ export function reconcile(
   const transfers = new Map(remote.document.transfers.map((t) => [t.id, t]));
   for (const transfer of local.document.transfers) {
     const existing = transfers.get(transfer.id);
-    if (
-      existing &&
-      (existing.operatingMinor !== transfer.operatingMinor ||
-        existing.savingsMinor !== transfer.savingsMinor)
-    )
+    if (existing && existing.amountMinor !== transfer.amountMinor)
       throw new SyncConflict(
         'Conflicting confirmations for the same member and month. Both copies are preserved; review them before continuing.',
       );
@@ -69,7 +65,7 @@ export { same as sameHousehold };
 export function decodeHousehold(value: unknown): HouseholdPlan {
   const doc = upgradeHousehold(value);
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     revision: doc.revision,
     memberNames: [doc.memberNames[0], doc.memberNames[1]],
     expenses: doc.expenses.map((e) => ({
@@ -90,8 +86,8 @@ export function decodeHousehold(value: unknown): HouseholdPlan {
       id: t.id,
       month: t.month,
       member: t.member,
-      operatingMinor: t.operatingMinor,
-      savingsMinor: t.savingsMinor,
+      fund: t.fund,
+      amountMinor: t.amountMinor,
       confirmedAt: t.confirmedAt,
     })),
     ledger: doc.ledger.map((event) => JSON.parse(canonicalEvent(event))),
