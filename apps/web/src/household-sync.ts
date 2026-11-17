@@ -67,12 +67,24 @@ export function reconcile(
   }
   result = {
     ...result,
+    trips: [
+      ...result.trips,
+      ...local.document.trips
+        .filter((t) => !result.trips.some((r) => r.id === t.id))
+        .map((t) => ({ ...t, archived: true, allocatedMinor: 0 })),
+    ],
     transfers: [...transfers.values()].sort((a, b) => a.id.localeCompare(b.id)),
     ledger: mergeLedger(local.document.ledger, remote.document.ledger),
     transferRetractions: [...retractions.values()].sort((a, b) =>
       a.id.localeCompare(b.id),
     ),
   };
+  for (const t of local.document.trips) {
+    if (result.trips.find((r) => r.id === t.id)?.label !== t.label)
+      throw new SyncConflict(
+        'A trip label changed on another device. Both copies are preserved for review.',
+      );
+  }
   validateHousehold(result);
   return result;
 }
@@ -81,8 +93,26 @@ export { same as sameHousehold };
 export function decodeHousehold(value: unknown): HouseholdPlan {
   const doc = upgradeHousehold(value);
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     revision: doc.revision,
+    trips: doc.trips.map((t) => ({
+      id: t.id,
+      name: t.name,
+      label: t.label,
+      startDate: t.startDate,
+      endDate: t.endDate,
+      days: t.days,
+      nights: t.nights,
+      foodPerPersonMinor: t.foodPerPersonMinor,
+      hotelPerNightMinor: t.hotelPerNightMinor,
+      flightPerPersonMinor: t.flightPerPersonMinor,
+      extrasMode: t.extrasMode,
+      extrasBasisPoints: t.extrasBasisPoints,
+      extrasMinor: t.extrasMinor,
+      allocatedMinor: t.allocatedMinor,
+      photo: t.photo,
+      archived: t.archived,
+    })),
     memberNames: [doc.memberNames[0], doc.memberNames[1]],
     incomes: doc.incomes.map((t) => ({
       month: t.month,

@@ -1,6 +1,17 @@
 # Milestones and owner review gates
 
-## Income funding and Investments — current review slice
+## Travel goals from joint savings — current review slice
+
+**Status: implemented; local verification passed, owner review pending.** Owner requested an airplane submenu and clarified one progress bar, funded from joint savings.
+
+- The **+** button creates a trip panel with name, stable expense label, optional dates or estimated duration, food per person, shared hotel/night, return flights/person and 15%/custom extras. Show a large funded percentage, single appearance-aware savings bar, remaining budget and indicative monthly saving pace.
+- Reserve confirmed savings without moving cash or double counting across goals. Tagged savings purchases consume a reserve once; reversals restore it. Personal/operating purchases remain separate. Show any later reservation shortfall. Archive releases and preserves history; restore supported.
+- Destination uploads become small metadata-free JPEGs in private JSON, with photo/document size limits. Expense labels/filter shortcuts survive renaming and archiving. Schema 7 preserves existing income, confirmations, credentials and history; concurrent trip-plan/earmark edits require review.
+- Two fictional trips join the isolated sample household. Verification passed: type checking, lint, build, formatting, 99 unit/API/domain/sync tests, 44 desktop/Android browser workflows and six production PWA cases. Coverage includes reserves/purchases/reversals/shortfall, migration/conflicts, photos/layout/filter/archive, offline trip creation and synchronization to a second device. Actual phone/private repository use remains owner review.
+
+Try: Travel → + → enter a trip, allocate joint savings, upload a destination photo and use Expenses to inspect trip-labelled spending. Archive to release the earmark while retaining history.
+
+## Income funding and Investments — earlier review slice
 
 **Status: implemented; local verification passed, owner review pending.** Owner confirmed the equal lower-income rule and requested income, home affordability and realistic chart data.
 

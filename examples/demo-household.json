@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "revision": 0,
   "memberNames": ["Alex (sample)", "Sam (sample)"],
   "expenses": [
@@ -69,6 +69,44 @@
       "operatingBasisPoints": 5000,
       "leisureBasisPoints": 3000,
       "savingsBasisPoints": 2000
+    }
+  ],
+  "trips": [
+    {
+      "id": "sample-rome",
+      "name": "Rome weekend (sample)",
+      "label": "trip:rome-weekend-mplerome",
+      "startDate": "2027-03-12",
+      "endDate": "2027-03-16",
+      "days": 5,
+      "nights": 4,
+      "foodPerPersonMinor": 4000,
+      "hotelPerNightMinor": 12500,
+      "flightPerPersonMinor": 18000,
+      "extrasMode": "percentage",
+      "extrasBasisPoints": 1500,
+      "extrasMinor": 0,
+      "allocatedMinor": 65000,
+      "photo": null,
+      "archived": false
+    },
+    {
+      "id": "sample-coast",
+      "name": "Coastal escape (sample)",
+      "label": "trip:coastal-escape-plecoast",
+      "startDate": null,
+      "endDate": null,
+      "days": 8,
+      "nights": 7,
+      "foodPerPersonMinor": 3500,
+      "hotelPerNightMinor": 11000,
+      "flightPerPersonMinor": 22000,
+      "extrasMode": "percentage",
+      "extrasBasisPoints": 1500,
+      "extrasMinor": 0,
+      "allocatedMinor": 95000,
+      "photo": null,
+      "archived": false
     }
   ],
   "transfers": [

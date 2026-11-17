@@ -287,6 +287,31 @@ function ExpenseEditor({
             onChange={(e) => setLabels(e.target.value)}
           />
         </label>
+        {document.trips.length > 0 && (
+          <select
+            aria-label="Add trip label"
+            value=""
+            onChange={(e) => {
+              const value = e.target.value;
+              if (
+                value &&
+                !labels
+                  .split(',')
+                  .map((s) => s.trim())
+                  .includes(value)
+              )
+                setLabels(labels.trim() ? `${labels}, ${value}` : value);
+            }}
+          >
+            <option value="">Add a trip label…</option>
+            {document.trips.map((t) => (
+              <option key={t.id} value={t.label}>
+                {t.name}
+                {t.archived ? ' (archived)' : ''}
+              </option>
+            ))}
+          </select>
+        )}
         <details
           className="advanced-options"
           open={advanced}
@@ -712,6 +737,7 @@ function ReversalEditor({
   );
 }
 export function LedgerPanel({
+  tripFilter,
   document,
   member,
   month,
@@ -721,6 +747,11 @@ export function LedgerPanel({
   openSettings,
   onDirty,
 }: {
+  tripFilter?: {
+    label: string;
+    start: string | null;
+    end: string | null;
+  } | null;
   document: HouseholdPlan;
   member: '' | 'a' | 'b';
   month: string;
@@ -756,10 +787,24 @@ export function LedgerPanel({
     );
   const [filterParty, setFilterParty] = useState('all'),
     [filterCategory, setFilterCategory] = useState('all');
+  const [filterLabel, setFilterLabel] = useState(tripFilter?.label ?? 'all');
   useEffect(() => {
     setFromDate(`${month}-01`);
     setToDate(`${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`);
   }, [month, year, index]);
+  useEffect(() => {
+    if (tripFilter) {
+      setFilterLabel(tripFilter.label);
+      setFromDate('2000-01-01');
+      setToDate('2100-12-31');
+    }
+  }, [tripFilter]);
+  const labelOptions = [
+    ...new Set([
+      ...document.trips.map((t) => t.label),
+      ...document.ledger.flatMap((e) => (e.kind === 'expense' ? e.labels : [])),
+    ]),
+  ].sort();
   useEffect(() => onDirty(editor !== null), [editor, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
   const balances = netBalances(document.ledger),
@@ -796,6 +841,9 @@ export function LedgerPanel({
             : false);
     return (
       partyMatch &&
+      (filterLabel === 'all' ||
+        (original.kind === 'expense' &&
+          original.labels.includes(filterLabel))) &&
       (filterCategory === 'all' ||
         (original.kind === 'expense' && original.category === filterCategory))
     );
@@ -948,15 +996,27 @@ export function LedgerPanel({
         className="panel ledger-history"
         aria-label="Expenses and payment history"
       >
-        <details className="standalone-details">
+        <details className="standalone-details" open={!!tripFilter}>
           <summary>
             Expenses &amp; payment history ({document.ledger.length})
           </summary>
+          {filterLabel !== 'all' && (
+            <p className="muted">
+              Label:{' '}
+              {document.trips.find((t) => t.label === filterLabel)?.name ??
+                filterLabel}{' '}
+              ·{' '}
+              {fromDate === '2000-01-01' && toDate === '2100-12-31'
+                ? 'all dates'
+                : 'selected dates'}
+            </p>
+          )}
           <details className="history-filter-options">
             <summary>
               Filters
               {filterParty !== 'all' ||
               filterCategory !== 'all' ||
+              filterLabel !== 'all' ||
               fromDate !== `${month}-01` ||
               toDate !==
                 `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`
@@ -1020,6 +1080,22 @@ export function LedgerPanel({
                   </select>
                 </label>
               </div>
+              <label>
+                Label / trip
+                <select
+                  aria-label="History label"
+                  value={filterLabel}
+                  onChange={(e) => setFilterLabel(e.target.value)}
+                >
+                  <option value="all">All labels</option>
+                  {labelOptions.map((label) => (
+                    <option key={label} value={label}>
+                      {document.trips.find((t) => t.label === label)?.name ??
+                        label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <p className="muted">
                 Filters affect history and spending charts, not outstanding
                 balances.
@@ -1034,6 +1110,7 @@ export function LedgerPanel({
                 );
                 setFilterParty('all');
                 setFilterCategory('all');
+                setFilterLabel('all');
               }}
             >
               Reset filters

@@ -51,17 +51,36 @@ export interface FundingRetraction {
   retractedAt: string;
 }
 export interface HouseholdPlan {
-  schemaVersion: 6;
+  schemaVersion: 7;
   revision: number;
   memberNames: [string, string];
   expenses: RecurringExpense[];
   savingsTargets: { month: string; amountMinor: number }[];
   incomes: { month: string; amountsMinor: [number, number] }[];
   fundingRules: FundingRule[];
+  trips: TripGoal[];
   transfers: TransferConfirmation[];
   transferRetractions: FundingRetraction[];
   legacyDrafts: BudgetDraft[];
   ledger: LedgerEvent[];
+}
+export interface TripGoal {
+  id: string;
+  name: string;
+  label: string;
+  startDate: string | null;
+  endDate: string | null;
+  days: number;
+  nights: number;
+  foodPerPersonMinor: number;
+  hotelPerNightMinor: number;
+  flightPerPersonMinor: number;
+  extrasMode: 'percentage' | 'fixed';
+  extrasBasisPoints: number;
+  extrasMinor: number;
+  allocatedMinor: number;
+  photo: string | null;
+  archived: boolean;
 }
 export interface FundingRule {
   month: string;

@@ -56,7 +56,7 @@ export async function readRecord(): Promise<LocalRecord> {
             tx.abort();
             return;
           }
-          if (oldVersion !== 6) {
+          if (oldVersion !== 7) {
             record.pending = true;
             store.put(record, 'current');
           }
@@ -127,6 +127,19 @@ export async function writeRecord(
             tx.abort();
             return;
           }
+        }
+        if (
+          current?.document.trips.some(
+            (t) =>
+              !next.document.trips.some(
+                (n) => n.id === t.id && n.label === t.label,
+              ),
+          )
+        ) {
+          failure =
+            'Trip labels and history must be retained. Archive the trip instead.';
+          tx.abort();
+          return;
         }
         if (
           current?.document.transfers.some(

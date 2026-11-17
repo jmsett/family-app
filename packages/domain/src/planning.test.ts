@@ -218,7 +218,7 @@ describe('independent fund confirmations and legacy upgrades', () => {
       ],
     };
     const migrated = upgradeHousehold(old);
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(7);
     expect(migrated.transfers.map((t) => [t.fund, t.amountMinor])).toEqual([
       ['operating', 40000],
       ['savings', 10000],

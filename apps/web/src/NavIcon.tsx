@@ -1,7 +1,7 @@
 export function NavIcon({
   name,
 }: {
-  name: 'overview' | 'plan' | 'charts' | 'investments';
+  name: 'overview' | 'plan' | 'charts' | 'investments' | 'travel';
 }) {
   return (
     <svg
@@ -24,6 +24,8 @@ export function NavIcon({
           <rect x="3" y="5" width="18" height="16" rx="2" />
           <path d="M7 3v4m10-4v4M3 11h18m-13 4h1m6 0h1m-8 3h1" />
         </>
+      ) : name === 'travel' ? (
+        <path d="m21 3-6 8 2 8-2 2-4-7-4 4-2-1 2-5-4-4 2-2 6 2 8-6Z" />
       ) : name === 'investments' ? (
         <>
           <path d="M3 10 12 4l9 6M4 11h16M6 12v7m6-7v7m6-7v7M3 21h18" />

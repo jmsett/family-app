@@ -134,6 +134,24 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await expect(page.getByLabel('Full repayment term (years)')).toHaveValue(
     '20',
   );
+  await navigate(page, 'Travel');
+  await page.getByRole('button', { name: 'Add trip', exact: true }).click();
+  await page.getByLabel('Trip name', { exact: true }).fill('Offline holiday');
+  await page.getByRole('button', { name: 'Save trip', exact: true }).click();
+  const offlineTrip = page.getByRole('region', {
+    name: 'Trip: Offline holiday',
+    exact: true,
+  });
+  await offlineTrip
+    .getByRole('button', { name: 'Allocate savings', exact: true })
+    .click();
+  await page.getByLabel('Trip allocated savings', { exact: true }).fill('50');
+  await page
+    .getByRole('button', { name: 'Save allocation', exact: true })
+    .click();
+  await page.reload();
+  await navigate(page, 'Travel');
+  await expect(offlineTrip).toContainText('€50.00 / €1,713.50');
   // The fictional history chunk is precached, even before the first sample visit.
   await page.goto('./?demo=1');
   await expect(
@@ -434,15 +452,43 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await navigate(second, 'Overview');
   // A new target never rewrites previously confirmed €125 contributions.
   await expect(second.getByTestId('savings-funds')).toHaveText('€230.00');
+  await context.setOffline(true);
+  await navigate(page, 'Travel');
+  await page.getByRole('button', { name: 'Add trip', exact: true }).click();
+  await page.getByLabel('Trip name', { exact: true }).fill('Synced Rome');
+  await page.getByRole('button', { name: 'Save trip', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Allocate savings', exact: true })
+    .click();
+  await page.getByLabel('Trip allocated savings', { exact: true }).fill('100');
+  await page
+    .getByRole('button', { name: 'Save allocation', exact: true })
+    .click();
+  await context.setOffline(false);
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Travel');
+  const syncedTrip = second.getByRole('region', {
+    name: 'Trip: Synced Rome',
+    exact: true,
+  });
+  await expect(syncedTrip.getByRole('progressbar')).toHaveCount(1);
+  await expect(syncedTrip).toContainText('€100.00 / €1,713.50');
   const withIncome = JSON.parse(
     Buffer.from(remote!.content, 'base64').toString('utf8'),
   );
+  expect(withIncome.trips).toHaveLength(1);
+  expect(withIncome.trips[0].allocatedMinor).toBe(10000);
   expect(withIncome.incomes).toHaveLength(1);
   expect(withIncome.fundingRules).toHaveLength(1);
   expect(uploaded.ledger).toHaveLength(5);
   expect(uploaded.transfers).toHaveLength(3);
   expect(uploaded.transferRetractions).toHaveLength(1);
-  expect(uploaded.schemaVersion).toBe(6);
+  expect(uploaded.schemaVersion).toBe(7);
   await secondContext.close();
 });
 

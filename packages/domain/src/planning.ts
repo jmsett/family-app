@@ -8,6 +8,7 @@ import type {
 } from '@family/shared';
 import { MAX_MINOR, validateDraft } from './index';
 import { canonicalEvent, validateLedger } from './ledger';
+import { validateTrips } from './travel';
 
 export const EXPENSE_CATEGORIES = [
   'Home & bills',
@@ -40,13 +41,14 @@ function amount(value: number) {
 }
 export function initialHousehold(): HouseholdPlan {
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     revision: 0,
     memberNames: ['Member A', 'Member B'],
     expenses: [],
     savingsTargets: [],
     incomes: [],
     fundingRules: [],
+    trips: [],
     transfers: [],
     transferRetractions: [],
     legacyDrafts: [],
@@ -117,13 +119,14 @@ export function dueDate(
 export function validateHousehold(doc: HouseholdPlan): void {
   if (
     !doc ||
-    doc.schemaVersion !== 6 ||
+    doc.schemaVersion !== 7 ||
     !Number.isSafeInteger(doc.revision) ||
     doc.revision < 0 ||
     !Array.isArray(doc.expenses) ||
     !Array.isArray(doc.savingsTargets) ||
     !Array.isArray(doc.incomes) ||
     !Array.isArray(doc.fundingRules) ||
+    !Array.isArray(doc.trips) ||
     !Array.isArray(doc.transfers) ||
     !Array.isArray(doc.transferRetractions) ||
     !Array.isArray(doc.legacyDrafts) ||
@@ -252,6 +255,18 @@ export function validateHousehold(doc: HouseholdPlan): void {
     }
   for (const draft of doc.legacyDrafts) validateDraft(draft);
   validateLedger(doc.ledger);
+  validateTrips(doc.trips);
+  for (const entry of doc.ledger) {
+    if (
+      entry.kind === 'expense' &&
+      entry.source === 'household' &&
+      entry.fund === 'savings' &&
+      doc.trips.filter((t) => entry.labels.includes(t.label)).length > 1
+    )
+      throw new Error(
+        'A savings-funded expense can use only one trip label. Split it into separate expenses for multiple trips.',
+      );
+  }
   // Validate aggregate limits, including forecasts at future effective boundaries.
   const months = new Set([
     ...doc.expenses.map((e) => e.firstDueDate.slice(0, 7)),
@@ -512,6 +527,26 @@ export function migrateLegacyDrafts(drafts: BudgetDraft[]): HouseholdPlan {
 export function canonicalHousehold(doc: HouseholdPlan): string {
   return JSON.stringify({
     memberNames: doc.memberNames,
+    trips: [...doc.trips]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        label: t.label,
+        startDate: t.startDate,
+        endDate: t.endDate,
+        days: t.days,
+        nights: t.nights,
+        foodPerPersonMinor: t.foodPerPersonMinor,
+        hotelPerNightMinor: t.hotelPerNightMinor,
+        flightPerPersonMinor: t.flightPerPersonMinor,
+        extrasMode: t.extrasMode,
+        extrasBasisPoints: t.extrasBasisPoints,
+        extrasMinor: t.extrasMinor,
+        allocatedMinor: t.allocatedMinor,
+        photo: t.photo,
+        archived: t.archived,
+      })),
     incomes: [...doc.incomes]
       .sort((a, b) => a.month.localeCompare(b.month))
       .map((t) => ({ month: t.month, amountsMinor: t.amountsMinor })),
@@ -613,6 +648,7 @@ export function upgradeHousehold(value: unknown): HouseholdPlan {
   if (next.schemaVersion === 5) {
     next = { ...next, schemaVersion: 6, incomes: [], fundingRules: [] };
   }
+  if (next.schemaVersion === 6) next = { ...next, schemaVersion: 7, trips: [] };
   validateHousehold(next as unknown as HouseholdPlan);
   return next as unknown as HouseholdPlan;
 }

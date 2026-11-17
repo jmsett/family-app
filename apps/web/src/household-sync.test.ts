@@ -5,6 +5,7 @@ import {
   initialHousehold,
 } from '@family/domain';
 import { decodeHousehold, GitHubHousehold, reconcile } from './household-sync';
+import type { HouseholdPlan } from '@family/shared';
 import type { LocalRecord } from './storage';
 const base = {
   ...initialHousehold(),
@@ -91,7 +92,7 @@ describe('household GitHub format', () => {
     expect(result?.document.expenses).toEqual([]);
     expect(result?.document.transfers).toEqual([]);
   });
-  it('round trips schema v6, preserves Unicode, uses SHA and excludes secrets', async () => {
+  it('round trips schema v7, preserves Unicode, uses SHA and excludes secrets', async () => {
     let encoded = '';
     const doc = { ...base, memberNames: ['José', '愛'] as [string, string] };
     const fetcher = vi
@@ -335,4 +336,70 @@ it('round trips income history and rules, merges offline confirmations and prote
       sha: 'c',
     }),
   ).toThrow('Both devices changed the plan');
+});
+
+it('preserves trip labels and photos, blocks concurrent allocations and retains discarded goals as archived on recovery', async () => {
+  const { tripLabel, allocateTrip, confirmFundTransfer, tripSavings } =
+    await import('@family/domain');
+  const trip = (id: string) => ({
+    id,
+    name: `Rome ${id}`,
+    label: tripLabel(`Rome ${id}`, id),
+    startDate: null,
+    endDate: null,
+    days: 7,
+    nights: 6,
+    foodPerPersonMinor: 3500,
+    hotelPerNightMinor: 10000,
+    flightPerPersonMinor: 20000,
+    extrasMode: 'percentage' as const,
+    extrasBasisPoints: 1500,
+    extrasMinor: 0,
+    allocatedMinor: 0,
+    photo: 'data:image/jpeg;base64,/9j/2Q==',
+    archived: false,
+  });
+  let shared: HouseholdPlan = {
+    ...base,
+    trips: [trip('goal-1'), trip('goal-2')],
+  };
+  shared = confirmFundTransfer(
+    shared,
+    '2030-01',
+    0,
+    'savings',
+    '2030-01-01T12:00:00Z',
+  );
+  const a = allocateTrip(shared, 'goal-1', 8000, '2030-01'),
+    b = allocateTrip(shared, 'goal-2', 8000, '2030-01');
+  expect(decodeHousehold(a).trips).toEqual(a.trips);
+  expect(() =>
+    reconcile(local({ document: a, base: shared }), { document: b, sha: 'b' }),
+  ).toThrow('Both devices changed the plan');
+  const recovered = reconcile(
+    local({ document: a, base: shared }),
+    { document: b, sha: 'b' },
+    true,
+  );
+  expect(tripSavings(recovered, '2030-01').allocatedMinor).toBe(8000);
+  const missing = { ...shared, trips: [] };
+  const retained = reconcile(
+    local({ document: a, base: shared }),
+    { document: missing, sha: 'c' },
+    true,
+  );
+  expect(retained.trips).toHaveLength(2);
+  expect(
+    retained.trips.every((t) => t.archived && t.allocatedMinor === 0),
+  ).toBe(true);
+  expect(retained.trips[0].label).toBe(a.trips[0].label);
+  expect(() =>
+    reconcile(local({ document: shared, pending: false }), {
+      document: {
+        ...shared,
+        trips: [{ ...shared.trips[0], label: 'trip:changed' }, shared.trips[1]],
+      },
+      sha: 'd',
+    }),
+  ).toThrow('label changed');
 });

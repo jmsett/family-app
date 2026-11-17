@@ -1,8 +1,8 @@
 
-const VERSION = '95314a9ff722f66d';
+const VERSION = 'ccb5731c71f3f2e3';
 const PREFIX = 'family-shell-' + encodeURIComponent(self.registration.scope) + '-';
 const CACHE = PREFIX + VERSION;
-const FILES = ["assets/HistoryPanel-BKLcq5Xx.js","assets/demo-household-B4MmkPyu.js","assets/fancy-canvas-LICENSE.txt","assets/index-CcmPAF7T.js","assets/index-uQJ16sdb.css","assets/lightweight-charts-LICENSE.txt","assets/lightweight-charts-NOTICE.txt","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","index.html","manifest.webmanifest"].map(path => new URL(path, self.registration.scope).href);
+const FILES = ["assets/HistoryPanel-CQ0HCj0A.js","assets/demo-household-BZB5pL9f.js","assets/fancy-canvas-LICENSE.txt","assets/index-BFinpztX.js","assets/index-DYlZqdld.css","assets/lightweight-charts-LICENSE.txt","assets/lightweight-charts-NOTICE.txt","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","index.html","manifest.webmanifest"].map(path => new URL(path, self.registration.scope).href);
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)));
 });

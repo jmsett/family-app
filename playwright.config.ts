@@ -6,6 +6,7 @@ export default defineConfig({
     'ledger.spec.ts',
     'charts.spec.ts',
     'investments.spec.ts',
+    'travel.spec.ts',
   ],
   fullyParallel: false,
   workers: 1,

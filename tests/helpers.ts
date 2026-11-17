@@ -1,7 +1,13 @@
 import { expect, type Page } from '@playwright/test';
 export async function navigate(
   page: Page,
-  name: 'Overview' | 'Monthly plan' | 'Charts' | 'Investments' | 'Settings',
+  name:
+    | 'Overview'
+    | 'Monthly plan'
+    | 'Charts'
+    | 'Investments'
+    | 'Travel'
+    | 'Settings',
 ) {
   await page.bringToFront();
   const button =

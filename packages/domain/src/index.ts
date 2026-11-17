@@ -88,3 +88,5 @@ export * from './ledger';
 export * from './history';
 
 export * from './investments';
+
+export * from './travel';

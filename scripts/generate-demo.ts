@@ -4,6 +4,7 @@ import { format } from 'prettier';
 import { createHash } from 'node:crypto';
 import {
   initialHousehold,
+  tripLabel,
   confirmFundTransfer,
   appendEntries,
   validateHousehold,
@@ -173,6 +174,44 @@ for (let y = 2025; y <= 2026; y++)
         },
       ]);
   }
+doc.trips = [
+  {
+    id: 'sample-rome',
+    name: 'Rome weekend (sample)',
+    label: tripLabel('Rome weekend', 'sample-rome'),
+    startDate: '2027-03-12',
+    endDate: '2027-03-16',
+    days: 5,
+    nights: 4,
+    foodPerPersonMinor: 4000,
+    hotelPerNightMinor: 12500,
+    flightPerPersonMinor: 18000,
+    extrasMode: 'percentage',
+    extrasBasisPoints: 1500,
+    extrasMinor: 0,
+    allocatedMinor: 65000,
+    photo: null,
+    archived: false,
+  },
+  {
+    id: 'sample-coast',
+    name: 'Coastal escape (sample)',
+    label: tripLabel('Coastal escape', 'sample-coast'),
+    startDate: null,
+    endDate: null,
+    days: 8,
+    nights: 7,
+    foodPerPersonMinor: 3500,
+    hotelPerNightMinor: 11000,
+    flightPerPersonMinor: 22000,
+    extrasMode: 'percentage',
+    extrasBasisPoints: 1500,
+    extrasMinor: 0,
+    allocatedMinor: 95000,
+    photo: null,
+    archived: false,
+  },
+];
 validateHousehold(doc);
 // Validate the planning envelope with the same limits as any saved document.
 const plan = monthlyPlan(doc, '2026-11');

@@ -28,6 +28,7 @@ import './style.css';
 const HistoryPanel = lazy(() => import('./HistoryPanel'));
 import { NavIcon } from './NavIcon';
 import { Investments } from './Investments';
+import { Travel } from './Travel';
 import { decodeHousehold } from './household-sync';
 const demoMode =
   new URLSearchParams(window.location.search).get('demo') === '1';
@@ -50,7 +51,8 @@ const monthName = (month: string) =>
     timeZone: 'UTC',
   }).format(new Date(`${month}-01T12:00:00Z`));
 type Commit = (doc: HouseholdPlan) => Promise<boolean>;
-type Page = 'overview' | 'plan' | 'charts' | 'investments' | 'settings';
+type Page =
+  'overview' | 'plan' | 'charts' | 'investments' | 'travel' | 'settings';
 
 function MonthlyPlan({
   document,
@@ -596,6 +598,7 @@ function MonthlyPlan({
 }
 
 function Overview({
+  expenseTrip,
   document,
   month,
   disabled,
@@ -605,6 +608,11 @@ function Overview({
   member,
   onDirty,
 }: {
+  expenseTrip: {
+    label: string;
+    start: string | null;
+    end: string | null;
+  } | null;
   document: HouseholdPlan;
   month: string;
   disabled: boolean;
@@ -778,6 +786,7 @@ function Overview({
         )}
       </p>
       <LedgerPanel
+        tripFilter={expenseTrip}
         key={month}
         document={document}
         member={member === '0' ? 'a' : member === '1' ? 'b' : ''}
@@ -1007,6 +1016,11 @@ function App() {
   const [document, setDocument] = useState<HouseholdPlan | null>(null);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [view, setView] = useState<Page>('overview');
+  const [expenseTrip, setExpenseTrip] = useState<{
+    label: string;
+    start: string | null;
+    end: string | null;
+  } | null>(null);
   const [busy, setBusy] = useState(true),
     [syncBusy, setSyncBusy] = useState(false),
     [dirty, setDirty] = useState(false);
@@ -1102,37 +1116,50 @@ function App() {
             </a>
             <div className="header-actions">
               <nav aria-label="Main navigation">
-                {(['overview', 'plan', 'charts', 'investments'] as const).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      className={`nav-icon ${view === page ? 'selected' : ''}`}
-                      aria-label={
-                        page === 'overview'
-                          ? 'Overview'
-                          : page === 'plan'
-                            ? 'Monthly plan'
-                            : page === 'charts'
-                              ? 'Charts'
-                              : 'Investments'
-                      }
-                      title={
-                        page === 'overview'
-                          ? 'Overview'
-                          : page === 'plan'
-                            ? 'Monthly plan'
-                            : page === 'charts'
-                              ? 'Charts'
-                              : 'Investments'
-                      }
-                      aria-current={view === page ? 'page' : undefined}
-                      disabled={busy || syncBusy}
-                      onClick={() => changeView(page)}
-                    >
-                      <NavIcon name={page} />
-                    </button>
-                  ),
-                )}
+                {(
+                  [
+                    'overview',
+                    'plan',
+                    'charts',
+                    'investments',
+                    'travel',
+                  ] as const
+                ).map((page) => (
+                  <button
+                    key={page}
+                    className={`nav-icon ${view === page ? 'selected' : ''}`}
+                    aria-label={
+                      page === 'overview'
+                        ? 'Overview'
+                        : page === 'plan'
+                          ? 'Monthly plan'
+                          : page === 'charts'
+                            ? 'Charts'
+                            : page === 'investments'
+                              ? 'Investments'
+                              : 'Travel'
+                    }
+                    title={
+                      page === 'overview'
+                        ? 'Overview'
+                        : page === 'plan'
+                          ? 'Monthly plan'
+                          : page === 'charts'
+                            ? 'Charts'
+                            : page === 'investments'
+                              ? 'Investments'
+                              : 'Travel'
+                    }
+                    aria-current={view === page ? 'page' : undefined}
+                    disabled={busy || syncBusy}
+                    onClick={() => {
+                      setExpenseTrip(null);
+                      changeView(page);
+                    }}
+                  >
+                    <NavIcon name={page} />
+                  </button>
+                ))}
               </nav>
               <button
                 className="settings-cog"
@@ -1169,7 +1196,9 @@ function App() {
                     ? 'Charts'
                     : view === 'investments'
                       ? 'Investments'
-                      : 'Settings'}
+                      : view === 'travel'
+                        ? 'Travel'
+                        : 'Settings'}
             </h1>
             {(view === 'overview' || view === 'plan') && (
               <label className="month-picker">
@@ -1241,6 +1270,7 @@ function App() {
                   month={month}
                   disabled={busy || syncBusy}
                   commit={commit}
+                  expenseTrip={expenseTrip}
                   openPlan={() => changeView('plan')}
                   openSettings={() => changeView('settings')}
                   member={member}
@@ -1265,6 +1295,23 @@ function App() {
                 >
                   <HistoryPanel document={document} today={today} />
                 </Suspense>
+              )}
+              {view === 'travel' && (
+                <Travel
+                  document={document}
+                  today={today}
+                  disabled={busy || syncBusy}
+                  commit={commit}
+                  onDirty={setDirty}
+                  showExpenses={(trip) => {
+                    setExpenseTrip({
+                      label: trip.label,
+                      start: trip.startDate,
+                      end: trip.endDate,
+                    });
+                    changeView('overview');
+                  }}
+                />
               )}
               {view === 'investments' && (
                 <Investments
