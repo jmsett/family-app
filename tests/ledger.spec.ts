@@ -29,7 +29,16 @@ test('expenses, partial repayments and corrections retain history and carry debt
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
   await expect(page.getByTestId('balance-a')).toHaveText('+€40.00');
   await expect(page.getByTestId('balance-b')).toHaveText('−€40.00');
-  await page.getByRole('button', { name: 'Settle up', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Suggested payments', exact: true }),
+  ).not.toBeVisible();
+  await page.getByText('Settle up', { exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Suggested payments', exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Record a payment', exact: true })
+    .click();
   await page.getByLabel('Settlement amount').fill('15');
   page.once('dialog', (d) => d.accept());
   await page
@@ -91,7 +100,16 @@ test('household advances reserve funds and household spending creates no duplica
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
   await expect(page.getByTestId('balance-household')).toHaveText('−€80.00');
   await expect(page.getByTestId('operating-funds')).toHaveText('-€80.00');
-  await page.getByRole('button', { name: 'Settle up', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Suggested payments', exact: true }),
+  ).not.toBeVisible();
+  await page.getByText('Settle up', { exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Suggested payments', exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Record a payment', exact: true })
+    .click();
   page.once('dialog', (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record payment', exact: true })
@@ -268,7 +286,18 @@ test('quick setups record the other payer with compact personal history and hidd
   await expect(
     row.getByRole('button', { name: 'Correct', exact: true }),
   ).not.toBeVisible();
+  await expect(row.locator('.activity-caption')).toHaveText(
+    'Member B paid €80.00',
+  );
+  await expect(row.locator('.activity-caption')).toBeVisible();
   await row.getByText('Details', { exact: true }).click();
+  await expect(row.locator('.entry-detail-content')).not.toContainText(
+    'Member B paid',
+  );
+  await expect(row.locator('.entry-detail-content')).not.toContainText(
+    'Full expense',
+  );
+  await expect(row).toHaveCSS('border-bottom-width', '0px');
   await expect(
     row.getByText('Recorded by Member A', { exact: false }),
   ).toBeVisible();
@@ -307,6 +336,14 @@ test('funds confirm independently, zero shares need no transfer, and savings mov
   await page.getByRole('button', { name: 'Save monthly plan' }).click();
   await navigate(page, 'Overview');
   await expect(page.getByRole('progressbar')).toHaveCount(0);
+  await expect(page.getByTestId('operating-funds')).toHaveCSS(
+    'text-align',
+    'center',
+  );
+  await expect(page.getByTestId('savings-funds')).toHaveCSS(
+    'text-align',
+    'center',
+  );
   page.once('dialog', (d) => d.accept());
   await page
     .getByRole('button', { name: 'Confirm my operating transfer', exact: true })

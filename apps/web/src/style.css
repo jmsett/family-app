@@ -1710,3 +1710,19 @@ select {
   white-space: nowrap;
   border: 0;
 }
+
+/* Keep the fund labels in place while centering their values. */
+.funds-grid .summary-card > strong {
+  text-align: center;
+}
+.activity-row:last-child {
+  border-bottom: 0;
+}
+.settle-up-section > summary {
+  min-height: 48px;
+  padding-block: 14px;
+  font-weight: 550;
+}
+.settle-up-section .suggested-payments {
+  margin-block: 4px 16px;
+}

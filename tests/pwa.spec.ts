@@ -251,7 +251,16 @@ test('devices synchronize plans, recover conflicts and merge independent offline
     );
   }
   await context.setOffline(true);
-  await page.getByRole('button', { name: 'Settle up', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Suggested payments', exact: true }),
+  ).not.toBeVisible();
+  await page.getByText('Settle up', { exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Suggested payments', exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Record a payment', exact: true })
+    .click();
   page.once('dialog', (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record payment', exact: true })

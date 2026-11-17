@@ -738,6 +738,7 @@ export function LedgerPanel({
       }
     | { type: 'reverse'; target: LedgerEvent };
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [settleOpen, setSettleOpen] = useState(false);
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     if (editor) {
@@ -813,8 +814,10 @@ export function LedgerPanel({
       fromDate <= toDate ? categorySpending(chartDoc, fromDate, toDate) : [],
     total = spending.reduce((sum, e) => sum + e.amountMinor, 0);
   function edit(value: Editor) {
-    if (member) setEditor(value);
-    else openSettings();
+    if (member) {
+      if (value.type === 'settlement') setSettleOpen(true);
+      setEditor(value);
+    } else openSettings();
   }
   const common = member
     ? {
@@ -862,35 +865,52 @@ export function LedgerPanel({
           </div>
         ))}
       </div>
-      {suggestions.length > 0 ? (
-        <div className="suggested-payments">
-          <h3>Suggested payments</h3>
-          <p className="muted">
-            Fewest payments for these three parties. Suggestions do not move
-            money.
-          </p>
-          {suggestions.map((s) => (
-            <div className="suggestion-row" key={`${s.from}:${s.to}`}>
-              <span>
-                {partyName(document, s.from)} → {partyName(document, s.to)}
-              </span>
-              <div>
-                <strong>{money(s.amountMinor)}</strong>
-                <button
-                  className="secondary"
-                  disabled={disabled || editor !== null}
-                  onClick={() => edit({ type: 'settlement', suggestion: s })}
-                  aria-label={`Record payment from ${partyName(document, s.from)} to ${partyName(document, s.to)}`}
-                >
-                  Record
-                </button>
+      <details
+        className="settle-up-section"
+        open={settleOpen}
+        onToggle={(e) => setSettleOpen(e.currentTarget.open)}
+      >
+        <summary>Settle up</summary>
+        {suggestions.length > 0 ? (
+          <div className="suggested-payments">
+            <h3>Suggested payments</h3>
+            <p className="muted">
+              Fewest payments for these three parties. Suggestions do not move
+              money.
+            </p>
+            {suggestions.map((s) => (
+              <div className="suggestion-row" key={`${s.from}:${s.to}`}>
+                <span>
+                  {partyName(document, s.from)} → {partyName(document, s.to)}
+                </span>
+                <div>
+                  <strong>{money(s.amountMinor)}</strong>
+                  <button
+                    className="secondary"
+                    disabled={disabled || editor !== null}
+                    onClick={() => edit({ type: 'settlement', suggestion: s })}
+                    aria-label={`Record payment from ${partyName(document, s.from)} to ${partyName(document, s.to)}`}
+                  >
+                    Record
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="settled-message">All balances are settled.</p>
-      )}
+            ))}
+          </div>
+        ) : (
+          <p className="settled-message">All balances are settled.</p>
+        )}
+        <button
+          className="secondary"
+          disabled={disabled || editor !== null || !suggestions.length}
+          onClick={() => edit({ type: 'settlement' })}
+        >
+          Record a payment
+        </button>
+        {common && editor?.type === 'settlement' && (
+          <SettlementEditor {...common} suggestion={editor.suggestion} />
+        )}
+      </details>
       <div className="entry-actions">
         <button
           className="primary"
@@ -898,13 +918,6 @@ export function LedgerPanel({
           onClick={() => edit({ type: 'expense' })}
         >
           Add expense
-        </button>
-        <button
-          className="secondary"
-          disabled={disabled || editor !== null || !suggestions.length}
-          onClick={() => edit({ type: 'settlement' })}
-        >
-          Settle up
         </button>
       </div>
       {!member && (
@@ -921,9 +934,6 @@ export function LedgerPanel({
           {...common}
           original={editor.original}
         />
-      )}
-      {common && editor?.type === 'settlement' && (
-        <SettlementEditor {...common} suggestion={editor.suggestion} />
       )}
       {common && editor?.type === 'reverse' && (
         <ReversalEditor {...common} target={editor.target} />
@@ -1042,6 +1052,23 @@ export function LedgerPanel({
                   <span className="muted">Choose identity</span>
                 )}
               </div>
+              {event.kind === 'expense' && (
+                <small className="activity-caption">
+                  {partyName(document, event.payer)} paid{' '}
+                  {money(event.amountMinor)}
+                </small>
+              )}
+              {event.kind === 'settlement' && (
+                <small className="activity-caption">
+                  {partyName(document, event.from)} paid{' '}
+                  {money(event.amountMinor)}
+                </small>
+              )}
+              {event.kind === 'fund-movement' && (
+                <small className="activity-caption">
+                  Moved {money(event.amountMinor)}
+                </small>
+              )}
               <details className="entry-details">
                 <summary>Details</summary>
                 <div className="entry-detail-content">
@@ -1056,8 +1083,7 @@ export function LedgerPanel({
                   {event.kind === 'expense' && (
                     <>
                       <p>
-                        Full expense: {money(event.amountMinor)} ·{' '}
-                        {partyName(document, event.payer)} paid ·{' '}
+                        Paid from{' '}
                         {event.source === 'household'
                           ? `${event.fund ?? 'operating'} funds`
                           : 'personal funds'}
@@ -1082,21 +1108,15 @@ export function LedgerPanel({
                           )
                           .join(' · ')}
                       </p>
-                      <p>
-                        The row shows the original effect on your balance.
-                        Outstanding debt is shown above after repayments.
-                      </p>
                     </>
                   )}
                   {event.kind === 'settlement' && (
                     <>
-                      <p>
-                        Payment: {money(event.amountMinor)}
-                        {event.note ? ` · ${event.note}` : ''}
-                        {event.from === 'household' || event.to === 'household'
-                          ? ` · ${event.fund ?? 'operating'} account`
-                          : ''}
-                      </p>
+                      {event.note && <p>{event.note}</p>}
+                      {(event.from === 'household' ||
+                        event.to === 'household') && (
+                        <p>Household account: {event.fund ?? 'operating'}</p>
+                      )}
                       <p>
                         The signed amount shows debt reduction, not income or
                         spending.
@@ -1109,7 +1129,7 @@ export function LedgerPanel({
                       {event.to === 'external'
                         ? 'outside tracked funds'
                         : event.to}
-                      : {money(event.amountMinor)} · no effect on personal debt
+                      {' · '}no effect on personal debt
                     </p>
                   )}
                   {event.kind === 'reversal' && <p>{event.reason}</p>}

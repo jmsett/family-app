@@ -10,6 +10,8 @@
 - Fund activity replaces duplicate transfer status and supports immutable operating/savings movements and withdrawals. Savings-funded purchases/repayments affect the selected account once; transfers never inflate expenses or debt.
 - Verification: 69 domain/API/sync tests, desktop/Android workflows, production offline and mocked GitHub synchronization; actual phone use and live private-repository behavior remain owner review checks.
 
+**UI refinement:** Payment suggestions now start inside collapsed Settle up. History adds a small payer/total caption, keeps complementary information under Details and removes the duplicate final divider. Fund amounts are centered while captions remain in place.
+
 **Next:** Historical chart explorer with mobile pan/zoom and daily/weekly/monthly/yearly intervals; compare spending totals, cumulative savings, operating balances and operating budget targets. Keep advanced controls collapsed. This pass does not implement that explorer or configurable unequal responsibilities.
 
 ## Shared expenses and settlements — earlier review slice
