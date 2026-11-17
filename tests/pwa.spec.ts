@@ -1,15 +1,14 @@
 import { expect, test } from '@playwright/test';
+import { confirm, connect, navigate, setSavings } from './helpers';
 
-test('Pages subpath installs its offline shell and keeps device drafts', async ({
+test('branch-published PWA keeps plans and confirmed funds offline', async ({
   page,
   context,
 }) => {
   await page.goto('./');
-  await page.getByLabel('Total allocation', { exact: true }).fill('1300.01');
-  await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.locator('.message.success')).toContainText(
-    'saved on this device',
-  );
+  await setSavings(page, '200');
+  await confirm(page, '0');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
   await page.evaluate(async () => {
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller)
@@ -21,26 +20,22 @@ test('Pages subpath installs its offline shell and keeps device drafts', async (
         ),
       );
   });
-  const manifest = await page.evaluate(async () => {
-    const link = document.querySelector<HTMLLinkElement>(
-      'link[rel="manifest"]',
-    )!;
-    return (await fetch(link.href)).json();
-  });
+  const manifest = await page.evaluate(async () =>
+    (
+      await fetch(
+        document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!.href,
+      )
+    ).json(),
+  );
   expect(manifest.display).toBe('standalone');
   expect(manifest.icons).toHaveLength(2);
   await context.setOffline(true);
   await page.reload();
-  await expect(
-    page.getByLabel('Total allocation', { exact: true }),
-  ).toHaveValue('1300.01');
-  await page.getByLabel('General savings', { exact: true }).fill('300');
-  await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect(page.locator('.message.success')).toBeVisible();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
+  await confirm(page, '1');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€200.00');
   await page.reload();
-  await expect(page.getByLabel('General savings', { exact: true })).toHaveValue(
-    '300.00',
-  );
+  await expect(page.getByTestId('savings-funds')).toHaveText('€200.00');
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -48,10 +43,12 @@ test('Pages subpath installs its offline shell and keeps device drafts', async (
   ).toBe(true);
 });
 
-test('two devices synchronize without overwriting divergent drafts and can recover explicitly', async ({
+test('devices synchronize plans, recover conflicts and merge independent offline confirmations', async ({
   browser,
   page,
+  context,
 }) => {
+  test.setTimeout(60000);
   const secondContext = await browser.newContext();
   const second = await secondContext.newPage();
   let remote: { content: string; sha: string } | null = null;
@@ -60,22 +57,24 @@ test('two devices synchronize without overwriting divergent drafts and can recov
     await device.route(
       /^https:\/\/api\.github\.com\/repos\/jmsett\/family-data(?:\/.*)?$/,
       async (route) => {
-        const request = route.request();
+        const request = route.request(),
+          headers = { 'Access-Control-Allow-Origin': '*' };
         if (request.method() === 'OPTIONS')
           return route.fulfill({
             status: 204,
             headers: {
-              'Access-Control-Allow-Origin': '*',
+              ...headers,
               'Access-Control-Allow-Headers': '*',
               'Access-Control-Allow-Methods': 'GET,PUT',
             },
           });
-        const headers = { 'Access-Control-Allow-Origin': '*' };
         if (!request.url().includes('/contents/'))
           return route.fulfill({
             json: { private: true, default_branch: 'main' },
             headers,
           });
+        if (request.url().includes('/contents/budgets'))
+          return route.fulfill({ status: 404, json: {}, headers });
         if (request.method() === 'PUT') {
           const body = request.postDataJSON();
           if ((remote?.sha ?? undefined) !== body.sha)
@@ -94,51 +93,56 @@ test('two devices synchronize without overwriting divergent drafts and can recov
     );
     await device.goto('http://localhost:4173/family-app/');
   }
-  await page.getByLabel('Total allocation', { exact: true }).fill('1400');
-  await page.getByRole('button', { name: 'Save draft' }).click();
-  await page.getByText('Sync & backups', { exact: true }).click();
-  await page.getByLabel('GitHub token').fill('github_pat_fake_test_only');
-  await page.getByRole('button', { name: 'Connect family-data' }).click();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Synced with' }),
-  ).toBeVisible();
-  expect(writes).toBe(1);
-  await second.getByText('Sync & backups', { exact: true }).click();
-  await second.getByLabel('GitHub token').fill('github_pat_fake_test_only');
-  await second.getByRole('button', { name: 'Connect family-data' }).click();
-  await expect(
-    second.getByLabel('Total allocation', { exact: true }),
-  ).toHaveValue('1400.00');
-  await second.getByRole('button', { name: 'Disconnect', exact: true }).click();
-  await second.getByLabel('Total allocation', { exact: true }).fill('1600');
-  await second.getByRole('button', { name: 'Save draft' }).click();
-  await page.getByLabel('Total allocation', { exact: true }).fill('1500');
-  await page.getByRole('button', { name: 'Save draft' }).click();
-  await expect.poll(() => writes).toBe(2);
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Synced with' }),
-  ).toBeVisible();
-  await second.getByLabel('GitHub token').fill('github_pat_fake_test_only');
-  await second.getByRole('button', { name: 'Connect family-data' }).click();
-  await expect(
-    second
+  const status = (device: typeof page) =>
+    device
       .getByRole('region', { name: 'Device synchronization' })
-      .getByRole('status'),
-  ).toContainText('Both devices changed');
+      .getByRole('status');
+  await setSavings(page, '200');
+  await connect(page);
+  await expect(status(page)).toContainText('Synced with');
+  expect(writes).toBe(1);
+  await connect(second);
+  await expect(status(second)).toContainText('Synced with');
+  await second.getByRole('button', { name: 'Disconnect', exact: true }).click();
+  await setSavings(second, '300');
+  await setSavings(page, '250');
+  await navigate(page, 'Settings');
+  await expect.poll(() => writes).toBe(2);
+  await expect(status(page)).toContainText('Synced with');
+  await connect(second);
+  await expect(status(second)).toContainText('Both devices changed');
   expect(writes).toBe(2);
-  await expect(
-    second.getByLabel('Total allocation', { exact: true }),
-  ).toHaveValue('1600.00');
-  const downloadPromise = second.waitForEvent('download');
-  await second.getByRole('button', { name: 'Export saved month JSON' }).click();
-  expect((await downloadPromise).suggestedFilename()).toMatch(
-    /^family-budget-/,
-  );
+  const download = second.waitForEvent('download');
+  await second.getByRole('button', { name: 'Export household JSON' }).click();
+  expect((await download).suggestedFilename()).toBe('family-household.json');
   second.once('dialog', (dialog) => dialog.accept());
   await second.getByRole('button', { name: 'Recover from GitHub' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Monthly plan');
   await expect(
-    second.getByLabel('Total allocation', { exact: true }),
-  ).toHaveValue('1500.00');
-  expect(writes).toBe(2);
+    second.getByLabel('Monthly savings', { exact: true }),
+  ).toHaveValue('250.00');
+  await context.setOffline(true);
+  await secondContext.setOffline(true);
+  await confirm(page, '0');
+  await confirm(second, '1');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€125.00');
+  await expect(second.getByTestId('savings-funds')).toHaveText('€125.00');
+  await context.setOffline(false);
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect.poll(() => writes).toBe(3);
+  await secondContext.setOffline(false);
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect.poll(() => writes).toBe(4);
+  await expect(status(second)).toContainText('Synced with');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(page, 'Overview');
+  await navigate(second, 'Overview');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€250.00');
+  await expect(second.getByTestId('savings-funds')).toHaveText('€250.00');
+  expect(writes).toBe(4);
   await secondContext.close();
 });

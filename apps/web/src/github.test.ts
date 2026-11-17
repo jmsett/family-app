@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { initialDraft } from '@family/domain';
 import { GitHubData, syncDecision } from './github';
-import type { LocalRecord } from './storage';
+interface LocalRecord {
+  draft: typeof draft;
+  base: typeof draft | null;
+  sha: string | null;
+  pending: boolean;
+}
 
 const draft = initialDraft('2030-01');
 const local = (extra: Partial<LocalRecord> = {}): LocalRecord => ({

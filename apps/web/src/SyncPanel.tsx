@@ -1,19 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { GitHubData, syncDecision } from './github';
+import { GitHubHousehold, reconcile, sameHousehold } from './household-sync';
 import { readRecord, writeRecord } from './storage';
 
 export function SyncPanel({
-  month,
   dirty,
   refreshKey,
   onRefresh,
   onBusy,
+  onStatus,
 }: {
-  month: string;
   dirty: boolean;
   refreshKey: number;
   onRefresh: () => Promise<void>;
   onBusy: (value: boolean) => void;
+  onStatus: (value: string) => void;
 }) {
   const [tokenInput, setTokenInput] = useState('');
   const [token, setToken] = useState('');
@@ -23,6 +23,8 @@ export function SyncPanel({
   const callbacks = useRef({ onRefresh, onBusy });
   callbacks.current = { onRefresh, onBusy };
 
+  useEffect(() => onStatus(status), [status, onStatus]);
+
   async function synchronize(recover = false) {
     if (!token || dirty || running.current) return;
     running.current = true;
@@ -30,54 +32,38 @@ export function SyncPanel({
     callbacks.current.onBusy(true);
     try {
       setStatus('Synchronizing…');
-      const api = new GitHubData(token);
+      const api = new GitHubHousehold(token);
       await api.verifyPrivate();
-      const local = await readRecord(month);
-      const remote = await api.read(month);
-      if (recover && !remote)
-        throw new Error(
-          'No remote draft exists for this month. Device copy was preserved.',
-        );
-      const decision = recover ? 'pull' : syncDecision(local, remote);
-      if (decision === 'pull' && remote) {
+      const local = await readRecord();
+      const remote = await api.readHousehold();
+      const document = reconcile(local, remote, recover);
+      const upload =
+        (local.pending && !remote) ||
+        (remote &&
+          (!sameHousehold(document, remote.document) || remote.sha === null));
+      const sha = upload
+        ? await api.writeHousehold(document, remote?.sha ?? null)
+        : (remote?.sha ?? null);
+      if (
+        !sameHousehold(document, local.document) ||
+        local.pending ||
+        local.sha !== sha
+      ) {
         await writeRecord(
           {
-            draft: { ...remote.draft, revision: local.draft.revision + 1 },
-            base: remote.draft,
-            sha: remote.sha,
-            pending: false,
-          },
-          local.draft.revision,
-        );
-      } else if (decision === 'push') {
-        const sha = await api.write(local.draft, remote?.sha ?? null);
-        await writeRecord(
-          {
-            ...local,
-            draft: { ...local.draft, revision: local.draft.revision + 1 },
-            base: local.draft,
+            document: { ...document, revision: local.document.revision + 1 },
+            base: sha ? document : null,
             sha,
             pending: false,
           },
-          local.draft.revision,
+          local.document.revision,
         );
-      } else if (remote && (local.pending || local.sha !== remote.sha)) {
-        await writeRecord(
-          {
-            ...local,
-            draft: { ...local.draft, revision: local.draft.revision + 1 },
-            base: remote.draft,
-            sha: remote.sha,
-            pending: false,
-          },
-          local.draft.revision,
-        );
+        await callbacks.current.onRefresh();
       }
-      await callbacks.current.onRefresh();
       setStatus(
-        remote || decision === 'push'
+        sha
           ? 'Synced with private GitHub repository.'
-          : 'No saved draft to sync. Save a proposal first.',
+          : 'No saved changes to sync.',
       );
     } catch (error) {
       setStatus((error as Error).message);
@@ -91,7 +77,7 @@ export function SyncPanel({
   syncRef.current = synchronize;
   useEffect(() => {
     let cancelled = false;
-    void readRecord(month)
+    void readRecord()
       .then((record) => {
         if (!cancelled)
           setStatus(
@@ -108,7 +94,7 @@ export function SyncPanel({
     return () => {
       cancelled = true;
     };
-  }, [month, refreshKey]);
+  }, [refreshKey]);
   useEffect(() => {
     if (!token || dirty) return;
     const sync = () => {
@@ -127,20 +113,19 @@ export function SyncPanel({
       window.removeEventListener('focus', sync);
       document.removeEventListener('visibilitychange', sync);
     };
-  }, [token, dirty, month, refreshKey]);
+  }, [token, dirty, refreshKey]);
 
   async function exportDraft() {
     try {
-      const local = await readRecord(month);
+      const local = await readRecord();
       const url = URL.createObjectURL(
-        new Blob(
-          [JSON.stringify({ schemaVersion: 1, draft: local.draft }, null, 2)],
-          { type: 'application/json' },
-        ),
+        new Blob([JSON.stringify(local.document, null, 2)], {
+          type: 'application/json',
+        }),
       );
       const link = document.createElement('a');
       link.href = url;
-      link.download = `family-budget-${month}.json`;
+      link.download = 'family-household.json';
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) {
@@ -202,7 +187,7 @@ export function SyncPanel({
                 onClick={() => {
                   if (
                     window.confirm(
-                      'Replace this month’s saved device draft with GitHub? Pending local changes will be discarded. Export your device copy first if needed.',
+                      'Replace unsynced plan settings with GitHub? Transfer confirmations will be preserved. Export your device copy first if needed.',
                     )
                   )
                     void synchronize(true);
@@ -214,7 +199,7 @@ export function SyncPanel({
                 disabled={working}
                 onClick={() => {
                   setToken('');
-                  setStatus('Disconnected. Device drafts are preserved.');
+                  setStatus('Disconnected. Device records are preserved.');
                 }}
               >
                 Disconnect
@@ -225,7 +210,7 @@ export function SyncPanel({
             disabled={working || dirty}
             onClick={() => void exportDraft()}
           >
-            Export saved month JSON
+            Export household JSON
           </button>
           {dirty && <p>Save your changes before synchronizing or exporting.</p>}
           <small>

@@ -720,3 +720,274 @@ footer {
     background: #183d2d;
   }
 }
+
+select {
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #c9d5cd;
+  border-radius: 7px;
+  color: #203c32;
+  background: #fff;
+  font-size: 16px;
+  margin-top: 6px;
+}
+select:focus-visible {
+  outline: 3px solid #aa7628;
+  outline-offset: 3px;
+}
+.focused-main {
+  max-width: 980px;
+}
+.funds-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.funds-grid .summary-card.total {
+  grid-column: auto;
+  display: block;
+}
+.funds-note {
+  margin: 10px 0 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.subtle-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.transfer-row,
+.expense-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.transfer-row > div,
+.expense-description {
+  min-width: 0;
+}
+.transfer-row strong,
+.expense-row strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.transfer-row small,
+.expense-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.confirmed-badge,
+.pending-badge {
+  padding: 5px 8px;
+  font-size: 12px;
+  border-radius: 5px;
+  white-space: nowrap;
+  background: #edf3ee;
+  color: var(--green);
+}
+.pending-badge {
+  color: var(--muted);
+  background: #f2f3f0;
+}
+.confirmation-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  max-width: 520px;
+}
+.confirmation-form > label {
+  max-width: 320px;
+}
+.transfer-breakdown {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.confirmation-form .primary {
+  justify-self: start;
+}
+.confirmation-form .muted {
+  line-height: 1.5;
+  margin-top: 0;
+}
+.inline-link {
+  border: 0;
+  background: transparent;
+  color: var(--green);
+  text-decoration: underline;
+  padding: 0;
+  font: inherit;
+}
+.secondary,
+.text-button {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid #c9d5cd;
+  border-radius: 7px;
+  background: #f7f9f6;
+  color: var(--green);
+  font-size: 13px;
+}
+.text-button {
+  background: transparent;
+  border: 0;
+  padding-inline: 8px;
+  text-decoration: underline;
+}
+.expense-list {
+  margin-bottom: 12px;
+}
+.expense-list .expense-row:first-child {
+  padding-top: 0;
+}
+.expense-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.expense-actions > strong {
+  font-variant-numeric: tabular-nums;
+}
+.empty-copy {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.expense-form {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 14px;
+}
+.expense-form label > small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.action-row {
+  display: flex;
+  gap: 8px;
+}
+.savings-setting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 240px);
+  align-items: center;
+  gap: 16px;
+}
+.savings-setting .muted {
+  line-height: 1.5;
+}
+.plan-totals {
+  margin-block: 18px;
+}
+.plan-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.plan-totals dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.planning-page .member-targets > div {
+  display: block;
+}
+.schedule-history {
+  margin-top: 16px;
+}
+.schedule-history > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+}
+.settings-form {
+  margin-top: 16px;
+}
+.settings-form button {
+  margin-top: 14px;
+}
+.settings-pane {
+  margin-top: 16px;
+}
+.settings-pane[hidden] {
+  display: none;
+}
+.focused-main footer {
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+.focused-main footer .sync-status {
+  font-size: 11px;
+  text-align: right;
+}
+@media (max-width: 650px) {
+  .brand > span:last-child {
+    display: none;
+  }
+  nav button {
+    padding-inline: 10px;
+  }
+  .expense-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+  }
+  .savings-setting {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .savings-setting label {
+    max-width: 260px;
+  }
+  .expense-form {
+    padding: 12px;
+  }
+  .funds-grid {
+    gap: 8px;
+  }
+  .funds-grid .summary-card {
+    padding: 14px;
+  }
+  .transfer-row {
+    gap: 10px;
+  }
+  .plan-totals {
+    font-size: 13px;
+  }
+  .planning-page .form-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .planning-page .form-footer .primary {
+    width: 100%;
+  }
+}

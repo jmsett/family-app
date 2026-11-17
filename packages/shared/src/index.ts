@@ -23,3 +23,31 @@ export interface Workspace {
   };
   categories: readonly string[];
 }
+
+export interface RecurringExpense {
+  id: string;
+  name: string;
+  amountMinor: number;
+  firstDueDate: string;
+  endDate: string | null;
+  archivedFromMonth: string | null;
+  category: string;
+  labels: string[];
+}
+export interface TransferConfirmation {
+  id: string;
+  month: string;
+  member: 0 | 1;
+  operatingMinor: number;
+  savingsMinor: number;
+  confirmedAt: string;
+}
+export interface HouseholdPlan {
+  schemaVersion: 2;
+  revision: number;
+  memberNames: [string, string];
+  expenses: RecurringExpense[];
+  savingsTargets: { month: string; amountMinor: number }[];
+  transfers: TransferConfirmation[];
+  legacyDrafts: BudgetDraft[];
+}

@@ -2,9 +2,19 @@
 
 **2026-11-17 owner direction:** Implement the public Pages PWA / private GitHub JSON architecture now, using `nunz-app` as reference. This explicitly authorizes the architecture slice spanning the former M1/M7/M8 boundaries while M0 feedback stays pending. See [plan.md](plan.md); legacy VPN/passkey/server requirements below are superseded for production. Other financial milestones still require owner review.
 
-## Architecture slice — Pages PWA and private JSON
+## Recurring planning and trust confirmations — current review slice
 
-**Status: implemented; live GitHub/phone setup and owner review pending.**
+**Status: implemented; owner review pending.** The owner requested separate Overview/Monthly plan screens, operating budgets derived from recurring expenses, fixed savings and 50/50 contributions. This explicitly authorizes the relevant planning, recurring and confirmation work across earlier milestone boundaries.
+
+- Overview shows only member-confirmed operating/savings funds and confirmation status; Monthly plan contains target definition; Settings contains names and sync/backups.
+- Recurring schedules include name, monthly amount, due/end dates, category and labels; archives retain earlier history. Savings carry effective-month history.
+- Full member/month declarations are immutable and self-reported. They merge across offline devices without double counting; plan conflicts remain explicit. Corrections/top-ups, CSV verification, actual expenses and charts are future work.
+- Schema-v2 `household.json` synchronizes the entire household. Browser and private legacy drafts migrate without deletion, fabricated expenses or confirmed funds.
+- Verification: 50 unit/API/protocol/domain tests, eight desktop/Android planner/migration cases and four production PWA/offline/sync cases pass locally. Actual private-repository pairing remains unverified.
+
+## Earlier architecture slice — Pages PWA and private JSON
+
+**Historical slice:** deployed on Pages; owner confirmed phone installation. Its per-month storage below is superseded by schema v2 above. Private-repository pairing and owner review remain pending.
 
 - Browser monthly drafts use IndexedDB with atomic revision checks; the production browser no longer requires the API.
 - Manifest, PNG icons, scoped build-versioned shell cache and a committed root build for Pages branch deployment are included.

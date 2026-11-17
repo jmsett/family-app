@@ -1,5 +1,15 @@
 # Foundation decisions and API contract
 
+## ADR 009: Recurring planning and trusted transfer confirmations
+
+Owner feedback replaces the editable total allocation and configurable split with derived monthly operating costs, fixed savings and a 50/50 split. Recurring schedules store first due date, optional inclusive end date, archive effective month, category and labels. Savings targets carry effective-month history. Overview contains confirmed funds, while all target definition lives in Monthly plan.
+
+The current record is `HouseholdPlan` schema 2 at private `household.json`. IndexedDB version 2 adds the `household` store, preserving old `budgets` rows. Migration preserves original manual drafts in `legacyDrafts`; operating targets are not converted into fake expenses. Existing savings targets carry forward as plans. When no remote household exists, the adapter migrates old private monthly JSON without deleting it. ADR 007's per-month data shape is superseded.
+
+Confirmation IDs are `YYYY-MM:memberIndex`. Each member declares the full displayed operating/savings transfer once per month; captured amounts never change after plan edits. The client uses a self-selected member with a clear trust label, not authenticated member identity or bank evidence. Partial payments, top-ups, reversals and statement matching require future work. Forecast schedules do not post actual expenses.
+
+Sync uses a three-way comparison of plan settings, unions immutable confirmations and deduplicates same-member/month declarations with matching amounts. Mismatched amounts require review. Remote recovery retains confirmations; the storage transaction rejects removing/changing recorded amounts. Whole-household exports include schedule/history/confirmation records, never credentials. GitHub's SHA guards concurrent writes. Actual immutable expense-ledger design remains future work.
+
 ## ADR 006: Public PWA and private GitHub JSON (accepted 2026-11-17)
 
 The owner selected the existing `nunz-app` deployment pattern: public `family-app` on Pages, local IndexedDB and private `family-data` JSON synchronized through repository-scoped fine-grained tokens. [plan.md](../plan.md) is the current architecture and implementation sequence. This supersedes the production storage/authentication/hosting/backup choices in ADRs 002–005 below; those sections document the legacy local API prototype. Financial domain invariants in ADR 001 still apply. GitHub repository access replaces application sessions; repository collaborators can read all JSON, so per-member private records require a separate future design.

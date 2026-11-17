@@ -1,6 +1,11 @@
 import { validateDraft } from '@family/domain';
 import type { BudgetDraft } from '@family/shared';
-import type { LocalRecord } from './storage';
+interface LocalRecord {
+  draft: BudgetDraft;
+  base: BudgetDraft | null;
+  sha: string | null;
+  pending: boolean;
+}
 
 const API = 'https://api.github.com/repos/jmsett/family-data';
 export interface RemoteRecord {
@@ -54,7 +59,7 @@ export class GitHubData {
     private fetcher: typeof fetch = (...args) => fetch(...args),
   ) {}
 
-  private async request(
+  protected async request(
     path: string,
     options?: RequestInit,
   ): Promise<Response> {
