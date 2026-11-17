@@ -2038,3 +2038,134 @@ nav button.nav-icon {
   opacity: 0.6;
   text-decoration: line-through;
 }
+
+.investments-page {
+  display: grid;
+  gap: 16px;
+}
+.income-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  margin-block: 24px;
+}
+.income-summary dd {
+  margin: 8px 0;
+  font-size: clamp(18px, 3vw, 28px);
+  overflow-wrap: anywhere;
+}
+.income-summary small,
+.scenario-cards span,
+.scenario-cards small {
+  color: var(--muted);
+}
+.member-income-editor,
+.calculator-options[open],
+.rule-percentages {
+  display: grid;
+  gap: 12px;
+}
+.calculator-options {
+  margin-block: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+.calculator-options summary {
+  min-height: 48px;
+  padding-block: 14px;
+  cursor: pointer;
+}
+.rule-percentages {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.home-price-result {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+  margin-block: 32px 24px;
+}
+.home-price-result strong {
+  font-size: clamp(22px, 4vw, 34px);
+  overflow-wrap: anywhere;
+  color: var(--accent);
+}
+.home-price-result span,
+.home-price-result small {
+  color: var(--muted);
+}
+.scenario-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.scenario-cards > div {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  background: var(--soft);
+  border-radius: 12px;
+}
+.scenario-cards strong {
+  font-size: clamp(18px, 3vw, 26px);
+  overflow-wrap: anywhere;
+}
+.affordability-plot {
+  margin-block: 28px;
+}
+.sensitivity-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 18px;
+}
+.sensitivity-row {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  gap: 8px 12px;
+  margin-bottom: 16px;
+}
+.sensitivity-row > span {
+  font-size: 13px;
+}
+.sensitivity-row small {
+  grid-column: 2;
+  font-size: 11px;
+  text-align: right;
+}
+.sensitivity-track {
+  position: relative;
+  align-self: center;
+  height: 12px;
+  border-radius: 8px;
+  background: var(--soft);
+}
+.sensitivity-band {
+  position: absolute;
+  min-width: 2px;
+  height: 100%;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #f9a647, #13e4ef);
+}
+@media (max-width: 600px) {
+  .income-summary {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px 12px;
+  }
+  .income-summary > div:last-child {
+    grid-column: 1 / -1;
+  }
+  .scenario-cards {
+    gap: 8px;
+  }
+  .scenario-cards > div {
+    padding: 12px;
+  }
+  .rule-percentages {
+    gap: 8px;
+  }
+  .brand > span {
+    display: none;
+  }
+}

@@ -51,15 +51,24 @@ export interface FundingRetraction {
   retractedAt: string;
 }
 export interface HouseholdPlan {
-  schemaVersion: 5;
+  schemaVersion: 6;
   revision: number;
   memberNames: [string, string];
   expenses: RecurringExpense[];
   savingsTargets: { month: string; amountMinor: number }[];
+  incomes: { month: string; amountsMinor: [number, number] }[];
+  fundingRules: FundingRule[];
   transfers: TransferConfirmation[];
   transferRetractions: FundingRetraction[];
   legacyDrafts: BudgetDraft[];
   ledger: LedgerEvent[];
+}
+export interface FundingRule {
+  month: string;
+  mode: 'fixed' | 'income';
+  operatingBasisPoints: number;
+  leisureBasisPoints: number;
+  savingsBasisPoints: number;
 }
 
 export type Party = 'a' | 'b' | 'household';

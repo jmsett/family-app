@@ -1,6 +1,7 @@
 import type {
   BudgetDraft,
   Fund,
+  FundingRule,
   HouseholdPlan,
   RecurringExpense,
   TransferConfirmation,
@@ -39,11 +40,13 @@ function amount(value: number) {
 }
 export function initialHousehold(): HouseholdPlan {
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     revision: 0,
     memberNames: ['Member A', 'Member B'],
     expenses: [],
     savingsTargets: [],
+    incomes: [],
+    fundingRules: [],
     transfers: [],
     transferRetractions: [],
     legacyDrafts: [],
@@ -114,11 +117,13 @@ export function dueDate(
 export function validateHousehold(doc: HouseholdPlan): void {
   if (
     !doc ||
-    doc.schemaVersion !== 5 ||
+    doc.schemaVersion !== 6 ||
     !Number.isSafeInteger(doc.revision) ||
     doc.revision < 0 ||
     !Array.isArray(doc.expenses) ||
     !Array.isArray(doc.savingsTargets) ||
+    !Array.isArray(doc.incomes) ||
+    !Array.isArray(doc.fundingRules) ||
     !Array.isArray(doc.transfers) ||
     !Array.isArray(doc.transferRetractions) ||
     !Array.isArray(doc.legacyDrafts) ||
@@ -138,6 +143,8 @@ export function validateHousehold(doc: HouseholdPlan): void {
     doc.transfers.length > 5000 ||
     doc.transferRetractions.length > 5000 ||
     doc.savingsTargets.length > 1212 ||
+    doc.incomes.length > 1212 ||
+    doc.fundingRules.length > 1212 ||
     doc.legacyDrafts.length > 1212
   )
     throw new Error('Household data exceeds the supported size.');
@@ -153,6 +160,40 @@ export function validateHousehold(doc: HouseholdPlan): void {
       throw new Error('Invalid or duplicate savings month.');
     amount(target.amountMinor);
     ids.add(target.month);
+  }
+  ids.clear();
+  for (const income of doc.incomes) {
+    if (
+      !income ||
+      !validMonth(income.month) ||
+      ids.has(income.month) ||
+      !Array.isArray(income.amountsMinor) ||
+      income.amountsMinor.length !== 2
+    )
+      throw new Error('Invalid or duplicate income month.');
+    income.amountsMinor.forEach(amount);
+    amount(income.amountsMinor[0] + income.amountsMinor[1]);
+    ids.add(income.month);
+  }
+  ids.clear();
+  for (const rule of doc.fundingRules) {
+    if (
+      !rule ||
+      !validMonth(rule.month) ||
+      ids.has(rule.month) ||
+      !['fixed', 'income'].includes(rule.mode) ||
+      [
+        rule.operatingBasisPoints,
+        rule.leisureBasisPoints,
+        rule.savingsBasisPoints,
+      ].some((n) => !Number.isSafeInteger(n) || n < 0 || n > 10000) ||
+      rule.operatingBasisPoints +
+        rule.leisureBasisPoints +
+        rule.savingsBasisPoints !==
+        10000
+    )
+      throw new Error('Funding percentages must total 100%.');
+    ids.add(rule.month);
   }
   ids.clear();
   for (const transfer of doc.transfers) {
@@ -215,15 +256,20 @@ export function validateHousehold(doc: HouseholdPlan): void {
   const months = new Set([
     ...doc.expenses.map((e) => e.firstDueDate.slice(0, 7)),
     ...doc.savingsTargets.map((t) => t.month),
+    ...doc.incomes.map((t) => t.month),
+    ...doc.fundingRules.map((t) => t.month),
     ...doc.transfers.map((t) => t.month),
   ]);
   for (const month of months) {
     const operating = doc.expenses
       .filter((e) => dueDate(e, month))
       .reduce((sum, e) => sum + e.amountMinor, 0);
-    const savings = savingsFor(doc, month);
+    const { operatingMinor: target, savingsMinor: savings } = monthlyPlan(
+      doc,
+      month,
+    );
     amount(operating);
-    amount(operating + savings);
+    amount(target + savings);
     for (const fund of ['operating', 'savings'] as const)
       amount(
         activeTransfers(doc)
@@ -239,6 +285,29 @@ export function savingsFor(doc: HouseholdPlan, month: string): number {
       .sort((a, b) => b.month.localeCompare(a.month))[0]?.amountMinor ?? 0
   );
 }
+export function incomesFor(
+  doc: HouseholdPlan,
+  month: string,
+): [number, number] {
+  return (
+    [...doc.incomes]
+      .filter((t) => t.month <= month)
+      .sort((a, b) => b.month.localeCompare(a.month))[0]?.amountsMinor ?? [0, 0]
+  );
+}
+export function fundingRuleFor(doc: HouseholdPlan, month: string): FundingRule {
+  return (
+    [...doc.fundingRules]
+      .filter((t) => t.month <= month)
+      .sort((a, b) => b.month.localeCompare(a.month))[0] ?? {
+      month,
+      mode: 'fixed',
+      operatingBasisPoints: 5000,
+      leisureBasisPoints: 3000,
+      savingsBasisPoints: 2000,
+    }
+  );
+}
 export function monthlyPlan(doc: HouseholdPlan, month: string) {
   if (!validMonth(month))
     throw new Error('Choose a month between 2000 and 2100.');
@@ -248,11 +317,23 @@ export function monthlyPlan(doc: HouseholdPlan, month: string) {
       return due ? [{ ...expense, due }] : [];
     })
     .sort((a, b) => a.due.localeCompare(b.due) || a.name.localeCompare(b.name));
-  const operatingMinor = expenses.reduce(
+  const recurringMinor = expenses.reduce(
     (sum, expense) => sum + expense.amountMinor,
     0,
   );
-  const savingsMinor = savingsFor(doc, month);
+  const rule = fundingRuleFor(doc, month);
+  const incomes = incomesFor(doc, month);
+  const minimumIncome = Math.min(...incomes);
+  const perMember = (basisPoints: number) =>
+    Math.floor((minimumIncome * basisPoints) / 10000);
+  const operatingMinor =
+    rule.mode === 'income'
+      ? 2 * perMember(rule.operatingBasisPoints)
+      : recurringMinor;
+  const savingsMinor =
+    rule.mode === 'income'
+      ? 2 * perMember(rule.savingsBasisPoints)
+      : savingsFor(doc, month);
   const split = (value: number): [number, number] => [
     Math.floor(value / 2),
     value - Math.floor(value / 2),
@@ -266,6 +347,12 @@ export function monthlyPlan(doc: HouseholdPlan, month: string) {
   const transfers = activeTransfers(doc).filter((t) => t.month === month);
   return {
     expenses,
+    recurringMinor,
+    rule,
+    incomes,
+    leisureAllowances: incomes.map((n) =>
+      Math.floor((n * rule.leisureBasisPoints) / 10000),
+    ),
     operatingMinor,
     savingsMinor,
     totalMinor: operatingMinor + savingsMinor,
@@ -425,6 +512,18 @@ export function migrateLegacyDrafts(drafts: BudgetDraft[]): HouseholdPlan {
 export function canonicalHousehold(doc: HouseholdPlan): string {
   return JSON.stringify({
     memberNames: doc.memberNames,
+    incomes: [...doc.incomes]
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map((t) => ({ month: t.month, amountsMinor: t.amountsMinor })),
+    fundingRules: [...doc.fundingRules]
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map((r) => ({
+        month: r.month,
+        mode: r.mode,
+        operatingBasisPoints: r.operatingBasisPoints,
+        leisureBasisPoints: r.leisureBasisPoints,
+        savingsBasisPoints: r.savingsBasisPoints,
+      })),
     ledger: [...doc.ledger]
       .sort((a, b) => a.id.localeCompare(b.id))
       .map((e) => JSON.parse(canonicalEvent(e))),
@@ -510,6 +609,9 @@ export function upgradeHousehold(value: unknown): HouseholdPlan {
       transfers: next.transfers.map((t) => ({ ...t, generation: 0 })),
       transferRetractions: next.transferRetractions ?? [],
     };
+  }
+  if (next.schemaVersion === 5) {
+    next = { ...next, schemaVersion: 6, incomes: [], fundingRules: [] };
   }
   validateHousehold(next as unknown as HouseholdPlan);
   return next as unknown as HouseholdPlan;

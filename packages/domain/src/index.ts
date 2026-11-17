@@ -86,3 +86,5 @@ export * from './planning';
 export * from './ledger';
 
 export * from './history';
+
+export * from './investments';

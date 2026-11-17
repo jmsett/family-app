@@ -1,6 +1,18 @@
 # Milestones and owner review gates
 
-## Retractable funding confirmations — current review slice
+## Income funding and Investments — current review slice
+
+**Status: implemented; local verification passed, owner review pending.** Owner confirmed the equal lower-income rule and requested income, home affordability and realistic chart data.
+
+- Effective-month net incomes in member settings; Investments icon/page with individual/household annual estimates (monthly × 12).
+- Collapsed home budget/rate inputs, annuity repayment and cash/purchase costs, conservative/optimistic price and rate-sensitivity visualization. Defaults follow the requested income caps/costs/rates, with 30 years, zero cash and editable 10% purchase costs. Scenarios remain device-local and never move funds.
+- Optional 50/30/20/custom income percentages: equal fund contributions based on lower income; leisure stays personal. Zero-income and recurring-cost gaps stay visible. Schema 6 preserves fixed-mode history, captured confirmations/retractions, credentials and appearance.
+- Fictional JSON with 23 months, 247 ledger entries and 91 confirmations. Isolated sample mode supports chart testing without accessing the household database or GitHub credentials; edits reset on reload.
+- Verification passed: type checking, lint, build, formatting, 92 unit/API/domain/sync tests, 40 desktop/Android browser workflows and six production PWA cases. Coverage includes annuity/zero-interest/cost math, effective-month rules, migration, sync conflicts, 320-pixel layouts, offline scenarios, first-use offline sample charts and unchanged real household storage after sample edits. Physical-phone and private-repository behavior remain owner review.
+
+Try: enter incomes under Settings, choose an effective month, open Investments, then explore Monthly plan → Funding rule. Open Settings → Sample household to test populated charts separately.
+
+## Retractable funding confirmations — earlier review slice
 
 **Status: implemented; local verification passed, owner review pending.** Owner requested undoing a mistaken funding confirmation by tapping its checkmark again.
 

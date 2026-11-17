@@ -91,7 +91,7 @@ describe('household GitHub format', () => {
     expect(result?.document.expenses).toEqual([]);
     expect(result?.document.transfers).toEqual([]);
   });
-  it('round trips schema v5, preserves Unicode, uses SHA and excludes secrets', async () => {
+  it('round trips schema v6, preserves Unicode, uses SHA and excludes secrets', async () => {
     let encoded = '';
     const doc = { ...base, memberNames: ['José', '愛'] as [string, string] };
     const fetcher = vi
@@ -272,4 +272,67 @@ it('deduplicates concurrent retractions and reconfirmations deterministically', 
     sha: 'c',
   });
   expect(activeTransfers(staleRetraction)[0].generation).toBe(1);
+});
+
+it('round trips income history and rules, merges offline confirmations and protects competing income edits', async () => {
+  const { canonicalHousehold, confirmFundTransfer, monthlyPlan } =
+    await import('@family/domain');
+  const planned = {
+    ...base,
+    incomes: [
+      { month: '2030-01', amountsMinor: [200000, 300000] as [number, number] },
+    ],
+    fundingRules: [
+      {
+        month: '2030-01',
+        mode: 'income' as const,
+        operatingBasisPoints: 5000,
+        leisureBasisPoints: 3000,
+        savingsBasisPoints: 2000,
+      },
+    ],
+  };
+  expect(canonicalHousehold(decodeHousehold(planned))).toBe(
+    canonicalHousehold(planned),
+  );
+  const a = confirmFundTransfer(
+    planned,
+    '2030-01',
+    0,
+    'operating',
+    '2030-01-02T12:00:00Z',
+  );
+  const b = confirmFundTransfer(
+    planned,
+    '2030-01',
+    1,
+    'savings',
+    '2030-01-02T12:00:00Z',
+  );
+  const merged = reconcile(local({ document: a, base: planned }), {
+    document: b,
+    sha: 'b',
+  });
+  expect(monthlyPlan(merged, '2030-01')).toMatchObject({
+    confirmedOperatingMinor: 100000,
+    confirmedSavingsMinor: 40000,
+  });
+  const editA = {
+    ...planned,
+    incomes: [
+      { month: '2030-01', amountsMinor: [220000, 300000] as [number, number] },
+    ],
+  };
+  const editB = {
+    ...planned,
+    incomes: [
+      { month: '2030-01', amountsMinor: [200000, 310000] as [number, number] },
+    ],
+  };
+  expect(() =>
+    reconcile(local({ document: editA, base: planned }), {
+      document: editB,
+      sha: 'c',
+    }),
+  ).toThrow('Both devices changed the plan');
 });

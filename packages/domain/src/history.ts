@@ -43,6 +43,8 @@ export function historyStart(doc: HouseholdPlan, today: string): string {
       ...doc.transfers.map(contributionDate),
       ...doc.expenses.map((e) => e.firstDueDate),
       ...doc.savingsTargets.map((t) => `${t.month}-01`),
+      ...doc.incomes.map((t) => `${t.month}-01`),
+      ...doc.fundingRules.map((t) => `${t.month}-01`),
       `${today.slice(0, 7)}-01`,
     ]
       .sort()[0]

@@ -5,6 +5,9 @@ import {
   confirmFundTransfer,
   retractFundTransfer,
   fundingStatus,
+  fundingRuleFor,
+  incomesFor,
+  parsePercentage,
   EXPENSE_CATEGORIES,
   monthlyPlan,
   parseMoney,
@@ -24,6 +27,10 @@ import { AppearanceContext } from './ProgressBar';
 import './style.css';
 const HistoryPanel = lazy(() => import('./HistoryPanel'));
 import { NavIcon } from './NavIcon';
+import { Investments } from './Investments';
+import { decodeHousehold } from './household-sync';
+const demoMode =
+  new URLSearchParams(window.location.search).get('demo') === '1';
 
 const money = (value: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(
@@ -43,7 +50,7 @@ const monthName = (month: string) =>
     timeZone: 'UTC',
   }).format(new Date(`${month}-01T12:00:00Z`));
 type Commit = (doc: HouseholdPlan) => Promise<boolean>;
-type Page = 'overview' | 'plan' | 'charts' | 'settings';
+type Page = 'overview' | 'plan' | 'charts' | 'investments' | 'settings';
 
 function MonthlyPlan({
   document,
@@ -62,6 +69,15 @@ function MonthlyPlan({
   const [savings, setSavings] = useState(
     amountInput(savingsFor(document, month)),
   );
+  const initialRule = fundingRuleFor(document, month);
+  const [ruleMode, setRuleMode] = useState(initialRule.mode);
+  const [percentages, setPercentages] = useState(
+    [
+      initialRule.operatingBasisPoints,
+      initialRule.leisureBasisPoints,
+      initialRule.savingsBasisPoints,
+    ].map((n) => String(n / 100)),
+  );
   const [adding, setAdding] = useState(false);
   const emptyExpense = () => ({
     name: '',
@@ -79,17 +95,57 @@ function MonthlyPlan({
   useEffect(() => {
     setDraft(document);
     setSavings(amountInput(savingsFor(document, month)));
+    const rule = fundingRuleFor(document, month);
+    setRuleMode(rule.mode);
+    setPercentages(
+      [
+        rule.operatingBasisPoints,
+        rule.leisureBasisPoints,
+        rule.savingsBasisPoints,
+      ].map((n) => String(n / 100)),
+    );
   }, [document, month]);
   let candidate = draft;
   let validation = '';
   try {
-    const amountMinor = parseMoney(savings);
+    const amountMinor =
+      ruleMode === 'income' ? savingsFor(draft, month) : parseMoney(savings);
     if (amountMinor !== savingsFor(draft, month))
       candidate = {
         ...draft,
         savingsTargets: [
           ...draft.savingsTargets.filter((t) => t.month !== month),
           { month, amountMinor },
+        ],
+      };
+    const savedRule = fundingRuleFor(draft, month);
+    const rule = {
+      month,
+      mode: ruleMode,
+      operatingBasisPoints:
+        ruleMode === 'income'
+          ? parsePercentage(percentages[0])
+          : savedRule.operatingBasisPoints,
+      leisureBasisPoints:
+        ruleMode === 'income'
+          ? parsePercentage(percentages[1])
+          : savedRule.leisureBasisPoints,
+      savingsBasisPoints:
+        ruleMode === 'income'
+          ? parsePercentage(percentages[2])
+          : savedRule.savingsBasisPoints,
+    };
+    if (
+      rule.mode !== savedRule.mode ||
+      rule.operatingBasisPoints !== savedRule.operatingBasisPoints ||
+      rule.leisureBasisPoints !== savedRule.leisureBasisPoints ||
+      rule.savingsBasisPoints !== savedRule.savingsBasisPoints
+    )
+      candidate = {
+        ...candidate,
+        fundingRules: [
+          ...candidate.fundingRules.filter((r) => r.month !== month),
+          rule,
         ],
       };
     validateHousehold(candidate);
@@ -198,8 +254,8 @@ function MonthlyPlan({
             </div>
           ) : (
             <p className="empty-copy">
-              No payments due this month. Add a recurring expense to define your
-              operating budget.
+              No payments due this month. Add recurring expenses to track your
+              fixed monthly costs.
             </p>
           )}
           {!adding ? (
@@ -371,7 +427,11 @@ function MonthlyPlan({
           )}
         </fieldset>
       </section>
-      <section className="panel" aria-label="Fixed savings">
+      <section
+        className="panel"
+        aria-label="Fixed savings"
+        hidden={ruleMode === 'income'}
+      >
         <fieldset disabled={disabled}>
           <div className="savings-setting">
             <div>
@@ -396,6 +456,80 @@ function MonthlyPlan({
           </div>
         </fieldset>
       </section>
+      <section className="panel" aria-label="Funding rule">
+        <fieldset disabled={disabled}>
+          <h2>Funding rule</h2>
+          <label>
+            Contribution method
+            <select
+              aria-label="Contribution method"
+              value={ruleMode}
+              onChange={(e) =>
+                setRuleMode(e.target.value as 'fixed' | 'income')
+              }
+            >
+              <option value="fixed">Recurring costs + fixed savings</option>
+              <option value="income">Income percentages</option>
+            </select>
+          </label>
+          {ruleMode === 'income' && (
+            <>
+              <div className="split-heading">
+                <p className="muted">
+                  Each contributes the lower income’s percentage. Leisure stays
+                  personal.
+                </p>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setPercentages(['50', '30', '20'])}
+                >
+                  50 / 30 / 20
+                </button>
+              </div>
+              <div className="rule-percentages">
+                {['Operating', 'Leisure', 'Savings'].map((label, i) => (
+                  <label key={label}>
+                    {label} %
+                    <input
+                      aria-label={`${label} percentage`}
+                      inputMode="decimal"
+                      value={percentages[i]}
+                      onChange={(e) =>
+                        setPercentages(
+                          percentages.map((v, j) =>
+                            i === j ? e.target.value : v,
+                          ),
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+              <p className="muted">
+                From {monthName(month)}. Income: {money(plan.incomes[0])} /{' '}
+                {money(plan.incomes[1])} monthly. Change income in Settings.
+              </p>
+              {plan.incomes.some((n) => n === 0) && (
+                <p className="validation">
+                  One income is zero or unset; both shared contributions are
+                  zero.
+                </p>
+              )}
+              <p className="muted">
+                Recurring costs: {money(plan.recurringMinor)}.{' '}
+                {plan.operatingMinor < plan.recurringMinor
+                  ? `Operating shortfall: ${money(plan.recurringMinor - plan.operatingMinor)}.`
+                  : `Operating headroom: ${money(plan.operatingMinor - plan.recurringMinor)}.`}
+              </p>
+              <small>
+                Personal leisure guide: {money(plan.leisureAllowances[0])} /{' '}
+                {money(plan.leisureAllowances[1])}. This is not a tracked fund.
+              </small>
+            </>
+          )}
+        </fieldset>
+      </section>
       <section className="panel" aria-label="Monthly contributions">
         <fieldset disabled={disabled}>
           <dl className="plan-totals">
@@ -414,7 +548,9 @@ function MonthlyPlan({
           </dl>
           <div className="split-heading">
             <h3>Member contributions</h3>
-            <span>50 / 50</span>
+            <span>
+              {ruleMode === 'income' ? 'Equal · lower income' : '50 / 50'}
+            </span>
           </div>
           <div className="member-targets">
             {document.memberNames.map((name, i) => (
@@ -666,6 +802,7 @@ function Overview({
   );
 }
 function Settings({
+  month,
   member,
   setMember,
   document,
@@ -673,6 +810,7 @@ function Settings({
   commit,
   onDirty,
 }: {
+  month: string;
   member: string;
   setMember: (value: string) => void;
   document: HouseholdPlan;
@@ -682,7 +820,37 @@ function Settings({
 }) {
   const [names, setNames] = useState(document.memberNames);
   useEffect(() => setNames(document.memberNames), [document]);
-  const dirty = JSON.stringify(names) !== JSON.stringify(document.memberNames);
+  const [incomeMonth, setIncomeMonth] = useState(month);
+  const [incomes, setIncomes] = useState(
+    incomesFor(document, incomeMonth).map(amountInput),
+  );
+  useEffect(
+    () => setIncomes(incomesFor(document, incomeMonth).map(amountInput)),
+    [document, incomeMonth],
+  );
+  let candidate = document,
+    validation = '';
+  try {
+    const amountsMinor = incomes.map(parseMoney) as [number, number];
+    candidate = { ...document, memberNames: names };
+    if (
+      JSON.stringify(amountsMinor) !==
+      JSON.stringify(incomesFor(document, incomeMonth))
+    )
+      candidate = {
+        ...candidate,
+        incomes: [
+          ...document.incomes.filter((t) => t.month !== incomeMonth),
+          { month: incomeMonth, amountsMinor },
+        ],
+      };
+    validateHousehold(candidate);
+  } catch (error) {
+    validation = (error as Error).message;
+  }
+  const dirty =
+    !!validation ||
+    canonicalHousehold(candidate) !== canonicalHousehold(document);
   useEffect(() => onDirty(dirty), [dirty, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
   return (
@@ -715,34 +883,79 @@ function Settings({
         className="settings-form"
         onSubmit={(e) => {
           e.preventDefault();
-          void commit({ ...document, memberNames: names });
+          if (!validation) void commit(candidate);
         }}
       >
         <fieldset disabled={disabled}>
+          <label>
+            Income effective from
+            <input
+              aria-label="Income effective month"
+              type="month"
+              min="2000-01"
+              max="2100-12"
+              value={incomeMonth}
+              onChange={(e) => {
+                if (
+                  e.target.value &&
+                  (JSON.stringify(incomes) ===
+                    JSON.stringify(
+                      incomesFor(document, incomeMonth).map(amountInput),
+                    ) ||
+                    window.confirm('Discard unsaved income changes?'))
+                )
+                  setIncomeMonth(e.target.value);
+              }}
+            />
+          </label>
           <div className="input-row">
             {names.map((name, i) => (
-              <label key={i}>
-                {i === 0 ? 'First member' : 'Second member'}
-                <input
-                  aria-label={i === 0 ? 'First member' : 'Second member'}
-                  value={name}
-                  maxLength={40}
-                  required
-                  onChange={(e) =>
-                    setNames(
-                      i === 0
-                        ? [e.target.value, names[1]]
-                        : [names[0], e.target.value],
-                    )
-                  }
-                />
-              </label>
+              <div className="member-income-editor" key={i}>
+                <label>
+                  {i === 0 ? 'First member' : 'Second member'}
+                  <input
+                    aria-label={i === 0 ? 'First member' : 'Second member'}
+                    value={name}
+                    maxLength={40}
+                    required
+                    onChange={(e) =>
+                      setNames(
+                        i === 0
+                          ? [e.target.value, names[1]]
+                          : [names[0], e.target.value],
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  Net monthly income (€)
+                  <input
+                    aria-label={`${i === 0 ? 'First' : 'Second'} member net monthly income`}
+                    inputMode="decimal"
+                    value={incomes[i]}
+                    onChange={(e) =>
+                      setIncomes(
+                        incomes.map((v, j) => (i === j ? e.target.value : v)),
+                      )
+                    }
+                  />
+                </label>
+              </div>
             ))}
           </div>
+          <p className="muted">
+            Regular take-home income, from the selected month until changed.
+            Annual estimates use 12 monthly payments.
+          </p>
+          {validation && (
+            <p className="validation" role="alert">
+              {validation}
+            </p>
+          )}
           <button
             className="secondary"
             type="submit"
-            disabled={disabled || !dirty}
+            disabled={disabled || !dirty || !!validation}
           >
             Save members
           </button>
@@ -774,6 +987,7 @@ function Settings({
 function App() {
   const appearance = useAppearance();
   const [member, setMember] = useState(() => {
+    if (demoMode) return '0';
     try {
       const saved = localStorage.getItem('family-active-member');
       return saved === '0' || saved === '1' ? saved : '';
@@ -783,6 +997,7 @@ function App() {
   });
   function chooseMember(value: string) {
     setMember(value);
+    if (demoMode) return;
     try {
       localStorage.setItem('family-active-member', value);
     } catch {
@@ -801,7 +1016,13 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    void readRecord()
+    void (
+      demoMode
+        ? import('../../../examples/demo-household.json').then((data) => ({
+            document: decodeHousehold(data.default),
+          }))
+        : readRecord()
+    )
       .then((record) => {
         if (!cancelled) setDocument(record.document);
       })
@@ -829,10 +1050,18 @@ function App() {
     setNotice('');
     try {
       validateHousehold(next);
-      setDocument(await saveHousehold(next));
+      setDocument(
+        demoMode
+          ? { ...next, revision: next.revision + 1 }
+          : await saveHousehold(next),
+      );
       setDirty(false);
       setRefreshKey((key) => key + 1);
-      setNotice('Saved on this device. Synchronization pending.');
+      setNotice(
+        demoMode
+          ? 'Demo updated. Reload to reset sample data.'
+          : 'Saved on this device. Synchronization pending.',
+      );
       return true;
     } catch (error) {
       setError((error as Error).message);
@@ -873,31 +1102,37 @@ function App() {
             </a>
             <div className="header-actions">
               <nav aria-label="Main navigation">
-                {(['overview', 'plan', 'charts'] as const).map((page) => (
-                  <button
-                    key={page}
-                    className={`nav-icon ${view === page ? 'selected' : ''}`}
-                    aria-label={
-                      page === 'overview'
-                        ? 'Overview'
-                        : page === 'plan'
-                          ? 'Monthly plan'
-                          : 'Charts'
-                    }
-                    title={
-                      page === 'overview'
-                        ? 'Overview'
-                        : page === 'plan'
-                          ? 'Monthly plan'
-                          : 'Charts'
-                    }
-                    aria-current={view === page ? 'page' : undefined}
-                    disabled={busy || syncBusy}
-                    onClick={() => changeView(page)}
-                  >
-                    <NavIcon name={page} />
-                  </button>
-                ))}
+                {(['overview', 'plan', 'charts', 'investments'] as const).map(
+                  (page) => (
+                    <button
+                      key={page}
+                      className={`nav-icon ${view === page ? 'selected' : ''}`}
+                      aria-label={
+                        page === 'overview'
+                          ? 'Overview'
+                          : page === 'plan'
+                            ? 'Monthly plan'
+                            : page === 'charts'
+                              ? 'Charts'
+                              : 'Investments'
+                      }
+                      title={
+                        page === 'overview'
+                          ? 'Overview'
+                          : page === 'plan'
+                            ? 'Monthly plan'
+                            : page === 'charts'
+                              ? 'Charts'
+                              : 'Investments'
+                      }
+                      aria-current={view === page ? 'page' : undefined}
+                      disabled={busy || syncBusy}
+                      onClick={() => changeView(page)}
+                    >
+                      <NavIcon name={page} />
+                    </button>
+                  ),
+                )}
               </nav>
               <button
                 className="settings-cog"
@@ -932,7 +1167,9 @@ function App() {
                   ? 'Monthly plan'
                   : view === 'charts'
                     ? 'Charts'
-                    : 'Settings'}
+                    : view === 'investments'
+                      ? 'Investments'
+                      : 'Settings'}
             </h1>
             {(view === 'overview' || view === 'plan') && (
               <label className="month-picker">
@@ -962,6 +1199,12 @@ function App() {
               </label>
             )}
           </section>
+          {demoMode && (
+            <div className="message" role="status">
+              Sample household · changes reset on reload · sync disabled.{' '}
+              <a href={import.meta.env.BASE_URL}>Return to your household</a>
+            </div>
+          )}
           {error && (
             <div className="message error" role="alert">
               {error}{' '}
@@ -1023,8 +1266,16 @@ function App() {
                   <HistoryPanel document={document} today={today} />
                 </Suspense>
               )}
+              {view === 'investments' && (
+                <Investments
+                  document={document}
+                  month={month}
+                  onMonth={setMonth}
+                />
+              )}
               {view === 'settings' && (
                 <Settings
+                  month={month}
                   member={member}
                   setMember={chooseMember}
                   document={document}
@@ -1037,19 +1288,40 @@ function App() {
           )}
           <div className="settings-pane" hidden={view !== 'settings'}>
             <AppearancePanel {...appearance} />
-            <SyncPanel
-              dirty={dirty || busy}
-              refreshKey={refreshKey}
-              onBusy={setSyncBusy}
-              onStatus={setSyncStatus}
-              onRefresh={async () => setDocument((await readRecord()).document)}
-            />
+            {!demoMode && (
+              <section className="panel">
+                <h2>Sample household</h2>
+                <p className="muted">
+                  Explore fictional history without changing your records or
+                  syncing.
+                </p>
+                <a
+                  className="inline-link"
+                  href={`${import.meta.env.BASE_URL}?demo=1`}
+                >
+                  Open sample household
+                </a>
+              </section>
+            )}
+            {!demoMode && (
+              <SyncPanel
+                dirty={dirty || busy}
+                refreshKey={refreshKey}
+                onBusy={setSyncBusy}
+                onStatus={setSyncStatus}
+                onRefresh={async () =>
+                  setDocument((await readRecord()).document)
+                }
+              />
+            )}
           </div>
           <footer>
             <span>EUR · Europe/Busingen</span>
             {view !== 'settings' && (
               <span className="sync-status" role="status">
-                {syncStatus}
+                {demoMode
+                  ? 'Sample data · not saved or synchronized'
+                  : syncStatus}
               </span>
             )}
           </footer>

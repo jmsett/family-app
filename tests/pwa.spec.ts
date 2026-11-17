@@ -111,6 +111,39 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
       exact: true,
     }),
   ).toBeVisible();
+  await navigate(page, 'Settings');
+  await page.getByLabel('First member net monthly income').fill('2200');
+  await page.getByLabel('Second member net monthly income').fill('3400');
+  await page.getByRole('button', { name: 'Save members', exact: true }).click();
+  await navigate(page, 'Investments');
+  await expect(page.getByTestId('annual-household-income')).toHaveText(
+    '€67,200.00',
+  );
+  await page
+    .getByText('2 · Rates & purchase assumptions', { exact: true })
+    .click();
+  await page.getByLabel('Full repayment term (years)').fill('20');
+  await page.reload();
+  await navigate(page, 'Investments');
+  await expect(page.getByTestId('annual-household-income')).toHaveText(
+    '€67,200.00',
+  );
+  await page
+    .getByText('2 · Rates & purchase assumptions', { exact: true })
+    .click();
+  await expect(page.getByLabel('Full repayment term (years)')).toHaveValue(
+    '20',
+  );
+  // The fictional history chunk is precached, even before the first sample visit.
+  await page.goto('./?demo=1');
+  await expect(
+    page.getByText(/Sample household · changes reset on reload/),
+  ).toBeVisible();
+  await navigate(page, 'Charts');
+  await page.getByLabel('Chart series').selectOption('savings');
+  await expect(page.getByTestId('chart-value')).not.toHaveText('€0.00');
+  await page.goto('./');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€80.00');
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -377,10 +410,39 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   const uploaded = JSON.parse(
     Buffer.from(remote!.content, 'base64').toString('utf8'),
   );
+  // Income and funding rules synchronize as effective-month plan settings.
+  await navigate(page, 'Settings');
+  await page.getByLabel('First member net monthly income').fill('2000');
+  await page.getByLabel('Second member net monthly income').fill('3000');
+  await page.getByRole('button', { name: 'Save members', exact: true }).click();
+  await navigate(page, 'Monthly plan');
+  await page.getByLabel('Contribution method').selectOption('income');
+  await page.getByRole('button', { name: 'Save monthly plan' }).click();
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Investments');
+  await expect(second.getByTestId('annual-household-income')).toHaveText(
+    '€60,000.00',
+  );
+  await navigate(second, 'Monthly plan');
+  await expect(second.getByLabel('Contribution method')).toHaveValue('income');
+  await expect(second.getByTestId('operating-target')).toHaveText('€2,000.00');
+  await navigate(second, 'Overview');
+  // A new target never rewrites previously confirmed €125 contributions.
+  await expect(second.getByTestId('savings-funds')).toHaveText('€230.00');
+  const withIncome = JSON.parse(
+    Buffer.from(remote!.content, 'base64').toString('utf8'),
+  );
+  expect(withIncome.incomes).toHaveLength(1);
+  expect(withIncome.fundingRules).toHaveLength(1);
   expect(uploaded.ledger).toHaveLength(5);
   expect(uploaded.transfers).toHaveLength(3);
   expect(uploaded.transferRetractions).toHaveLength(1);
-  expect(uploaded.schemaVersion).toBe(5);
+  expect(uploaded.schemaVersion).toBe(6);
   await secondContext.close();
 });
 
