@@ -28,6 +28,14 @@ Independent confirmations merge by stable `month:member:fund` ID; identical amou
 - Fold the old redundant member transfer section into Fund activity. Add immutable movements between operating/savings or out of tracked funds; they change balances without spending/debt. Purchases and household repayments can choose a fund under Advanced options. Savings availability subtracts recorded spending, outgoing transfers and withdrawals, adding incoming funds. Negative balances reflect records instead of silently deleting transactions.
 - Migrate v2/v3 funding records to schema4 IDs `month:member:fund`; preserve ledger events, revision/baseline, credentials and appearance. Independent fund confirmations and UUID movements union safely offline; same-ID monetary conflicts remain blocked.
 
+## Current refinement — funding comparisons, pie chart and monthly panels
+
+- Monthly plan contains distinct recurring-expense, fixed-savings and contribution-summary panels, sharing one atomic Save monthly plan and existing unsaved-change protection.
+- Overview category spending is an SVG pie with a category/amount/percentage legend, including a proper full circle for one category and the existing empty state. Existing history filters and device colors remain shared.
+- Replace the separate operating-budget chart choice with overlaid fund views. Savings and operating charts show available cumulative funds, confirmed contributions in the month ending the interval, and that month's goal. The legend/status and exact-value table show all three without confusing expenditure with a missed contribution. Monthly funding resets each month; money carries forward. Yearly/weekly points keep their explicit ending-month funding convention.
+- Enable right value-axis vertical drag on mouse and touch. The renderer requires vertical touch handling for this gesture; enable it only when a gesture begins on the right axis so ordinary plot swipes still scroll the page. Reset value scale/All restore auto scaling. Preserve horizontal pan, pinch zoom and keyboard navigation.
+- Schema 4 financial records and credentials remain unchanged. Funding comparisons are derived fields, not additional financial entries.
+
 ## Authorized historical chart explorer and overview refinement
 
 The owner explicitly requested implementing this pass now. Top navigation is Home → Calendar/Monthly plan → Charts → Settings, using labeled icon buttons. Fund numbers are centered in their value area, with small monthly total/own-share captions above checkmarks and concise confirmations. Remove the duplicate “Your balance” summary. History and current category spending each occupy their own section panel.

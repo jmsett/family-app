@@ -184,263 +184,277 @@ function MonthlyPlan({
     </article>
   );
   return (
-    <section className="panel planning-page" aria-label="Monthly plan">
-      <fieldset disabled={disabled}>
-        <div className="section-heading">
-          <h2>Recurring expenses</h2>
-          <span className="subtle-label">Monthly payments</span>
-        </div>
-        {plan.expenses.length ? (
-          <div className="expense-list">
-            {plan.expenses.map((e) => expenseRow(e, e.due))}
+    <div className="planning-page">
+      <section className="panel" aria-label="Recurring expenses">
+        <fieldset disabled={disabled}>
+          <div className="section-heading">
+            <h2>Recurring expenses</h2>
+            <span className="subtle-label">Monthly payments</span>
           </div>
-        ) : (
-          <p className="empty-copy">
-            No payments due this month. Add a recurring expense to define your
-            operating budget.
-          </p>
-        )}
-        {!adding ? (
-          <button
-            className="secondary"
-            type="button"
-            onClick={() => setAdding(true)}
-          >
-            Add recurring expense
-          </button>
-        ) : (
-          <form className="expense-form" onSubmit={addExpense}>
-            <h3>New recurring expense</h3>
-            <label>
-              Expense name
-              <input
-                aria-label="Expense name"
-                maxLength={80}
-                value={expense.name}
-                onChange={(e) => {
-                  setExpense({ ...expense, name: e.target.value });
-                  setExpenseTouched(true);
-                }}
-                required
-              />
-            </label>
-            <div className="input-row">
-              <label>
-                Monthly amount
-                <input
-                  aria-label="Monthly amount"
-                  inputMode="decimal"
-                  value={expense.amount}
-                  onChange={(e) => {
-                    setExpense({ ...expense, amount: e.target.value });
-                    setExpenseTouched(true);
-                  }}
-                  required
-                />
-              </label>
-              <label>
-                First due date
-                <input
-                  aria-label="First due date"
-                  type="date"
-                  min="2000-01-01"
-                  max="2100-12-31"
-                  value={expense.firstDueDate}
-                  onChange={(e) => {
-                    setExpense({ ...expense, firstDueDate: e.target.value });
-                    setExpenseTouched(true);
-                  }}
-                  required
-                />
-              </label>
+          {plan.expenses.length ? (
+            <div className="expense-list">
+              {plan.expenses.map((e) => expenseRow(e, e.due))}
             </div>
-            <label>
-              Category
-              <select
-                aria-label="Category"
-                value={expense.category}
-                onChange={(e) => {
-                  setExpense({ ...expense, category: e.target.value });
-                  setExpenseTouched(true);
-                }}
-              >
-                {[
-                  ...new Set([
-                    ...EXPENSE_CATEGORIES,
-                    ...draft.expenses.map((entry) => entry.category),
-                  ]),
-                ].map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-                <option value="">Custom category…</option>
-              </select>
-            </label>
-            {expense.category === '' && (
-              <label>
-                Custom category
-                <input
-                  aria-label="Custom category"
-                  maxLength={40}
-                  value={expense.customCategory}
-                  onChange={(e) => {
-                    setExpense({ ...expense, customCategory: e.target.value });
-                    setExpenseTouched(true);
-                  }}
-                  required
-                />
-              </label>
-            )}
-            <label>
-              Labels <small>Optional, separated by commas</small>
-              <input
-                aria-label="Labels"
-                value={expense.labels}
-                onChange={(e) => {
-                  setExpense({ ...expense, labels: e.target.value });
-                  setExpenseTouched(true);
-                }}
-              />
-            </label>
-            <label>
-              Payment duration
-              <select
-                aria-label="Payment duration"
-                value={expense.duration}
-                onChange={(e) => {
-                  setExpense({ ...expense, duration: e.target.value });
-                  setExpenseTouched(true);
-                }}
-              >
-                <option value="indefinite">Until archived</option>
-                <option value="limited">Until a specific date</option>
-              </select>
-            </label>
-            {expense.duration === 'limited' && (
-              <label>
-                Last payment date
-                <input
-                  aria-label="Last payment date"
-                  type="date"
-                  min={expense.firstDueDate}
-                  max="2100-12-31"
-                  value={expense.endDate}
-                  onChange={(e) => {
-                    setExpense({ ...expense, endDate: e.target.value });
-                    setExpenseTouched(true);
-                  }}
-                  required
-                />
-              </label>
-            )}
-            {expenseError && (
-              <p className="validation" role="alert">
-                {expenseError}
-              </p>
-            )}
-            <div className="action-row">
-              <button className="secondary" type="submit">
-                Add to plan
-              </button>
-              <button
-                className="text-button"
-                type="button"
-                onClick={() => {
-                  setAdding(false);
-                  setExpense(emptyExpense());
-                  setExpenseTouched(false);
-                  setExpenseError('');
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
-        {other.length > 0 && (
-          <details className="schedule-history">
-            <summary>Other schedules &amp; history ({other.length})</summary>
-            {other.map((e) => expenseRow(e))}
-          </details>
-        )}
-        <div className="divider" />
-        <div className="savings-setting">
-          <div>
-            <h2>Fixed savings</h2>
-            <p className="muted">
-              Monthly from {monthName(month)}, until changed.
+          ) : (
+            <p className="empty-copy">
+              No payments due this month. Add a recurring expense to define your
+              operating budget.
             </p>
-          </div>
-          <label>
-            Monthly savings
-            <span className="currency-input">
-              <span>€</span>
-              <input
-                aria-label="Monthly savings"
-                inputMode="decimal"
-                value={savings}
-                onChange={(e) => setSavings(e.target.value)}
-                required
-              />
-            </span>
-          </label>
-        </div>
-        <dl className="plan-totals">
-          <div>
-            <dt>Operating budget</dt>
-            <dd data-testid="operating-target">{money(plan.operatingMinor)}</dd>
-          </div>
-          <div>
-            <dt>Total monthly target</dt>
-            <dd data-testid="total-target">
-              {validation ? '—' : money(plan.totalMinor)}
-            </dd>
-          </div>
-        </dl>
-        <div className="split-heading">
-          <h3>Member contributions</h3>
-          <span>50 / 50</span>
-        </div>
-        <div className="member-targets">
-          {document.memberNames.map((name, i) => (
-            <div key={i}>
-              <div>
-                <span>{name}</span>
-                <strong data-testid={`target-${i}`}>
-                  {validation ? '—' : money(plan.memberTargets[i])}
-                </strong>
-                <small>
-                  {money(plan.operatingShares[i])} operating ·{' '}
-                  {money(plan.savingsShares[i])} savings
-                </small>
+          )}
+          {!adding ? (
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => setAdding(true)}
+            >
+              Add recurring expense
+            </button>
+          ) : (
+            <form className="expense-form" onSubmit={addExpense}>
+              <h3>New recurring expense</h3>
+              <label>
+                Expense name
+                <input
+                  aria-label="Expense name"
+                  maxLength={80}
+                  value={expense.name}
+                  onChange={(e) => {
+                    setExpense({ ...expense, name: e.target.value });
+                    setExpenseTouched(true);
+                  }}
+                  required
+                />
+              </label>
+              <div className="input-row">
+                <label>
+                  Monthly amount
+                  <input
+                    aria-label="Monthly amount"
+                    inputMode="decimal"
+                    value={expense.amount}
+                    onChange={(e) => {
+                      setExpense({ ...expense, amount: e.target.value });
+                      setExpenseTouched(true);
+                    }}
+                    required
+                  />
+                </label>
+                <label>
+                  First due date
+                  <input
+                    aria-label="First due date"
+                    type="date"
+                    min="2000-01-01"
+                    max="2100-12-31"
+                    value={expense.firstDueDate}
+                    onChange={(e) => {
+                      setExpense({ ...expense, firstDueDate: e.target.value });
+                      setExpenseTouched(true);
+                    }}
+                    required
+                  />
+                </label>
               </div>
+              <label>
+                Category
+                <select
+                  aria-label="Category"
+                  value={expense.category}
+                  onChange={(e) => {
+                    setExpense({ ...expense, category: e.target.value });
+                    setExpenseTouched(true);
+                  }}
+                >
+                  {[
+                    ...new Set([
+                      ...EXPENSE_CATEGORIES,
+                      ...draft.expenses.map((entry) => entry.category),
+                    ]),
+                  ].map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                  <option value="">Custom category…</option>
+                </select>
+              </label>
+              {expense.category === '' && (
+                <label>
+                  Custom category
+                  <input
+                    aria-label="Custom category"
+                    maxLength={40}
+                    value={expense.customCategory}
+                    onChange={(e) => {
+                      setExpense({
+                        ...expense,
+                        customCategory: e.target.value,
+                      });
+                      setExpenseTouched(true);
+                    }}
+                    required
+                  />
+                </label>
+              )}
+              <label>
+                Labels <small>Optional, separated by commas</small>
+                <input
+                  aria-label="Labels"
+                  value={expense.labels}
+                  onChange={(e) => {
+                    setExpense({ ...expense, labels: e.target.value });
+                    setExpenseTouched(true);
+                  }}
+                />
+              </label>
+              <label>
+                Payment duration
+                <select
+                  aria-label="Payment duration"
+                  value={expense.duration}
+                  onChange={(e) => {
+                    setExpense({ ...expense, duration: e.target.value });
+                    setExpenseTouched(true);
+                  }}
+                >
+                  <option value="indefinite">Until archived</option>
+                  <option value="limited">Until a specific date</option>
+                </select>
+              </label>
+              {expense.duration === 'limited' && (
+                <label>
+                  Last payment date
+                  <input
+                    aria-label="Last payment date"
+                    type="date"
+                    min={expense.firstDueDate}
+                    max="2100-12-31"
+                    value={expense.endDate}
+                    onChange={(e) => {
+                      setExpense({ ...expense, endDate: e.target.value });
+                      setExpenseTouched(true);
+                    }}
+                    required
+                  />
+                </label>
+              )}
+              {expenseError && (
+                <p className="validation" role="alert">
+                  {expenseError}
+                </p>
+              )}
+              <div className="action-row">
+                <button className="secondary" type="submit">
+                  Add to plan
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => {
+                    setAdding(false);
+                    setExpense(emptyExpense());
+                    setExpenseTouched(false);
+                    setExpenseError('');
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+          {other.length > 0 && (
+            <details className="schedule-history">
+              <summary>Other schedules &amp; history ({other.length})</summary>
+              {other.map((e) => expenseRow(e))}
+            </details>
+          )}
+        </fieldset>
+      </section>
+      <section className="panel" aria-label="Fixed savings">
+        <fieldset disabled={disabled}>
+          <div className="savings-setting">
+            <div>
+              <h2>Fixed savings</h2>
+              <p className="muted">
+                Monthly from {monthName(month)}, until changed.
+              </p>
             </div>
-          ))}
-        </div>
-        {validation && (
-          <p className="validation" role="alert">
-            {validation}
-          </p>
-        )}
-        <div className="form-footer">
-          <small>Targets are plans, not transferred funds.</small>
-          <button
-            type="button"
-            className="primary"
-            disabled={disabled || !dirty || !!validation || expenseTouched}
-            onClick={() => void commit(candidate)}
-          >
-            Save monthly plan
-          </button>
-        </div>
-        {expenseTouched && (
-          <p className="muted">
-            Add the expense to your plan or cancel it before saving.
-          </p>
-        )}
-      </fieldset>
-    </section>
+            <label>
+              Monthly savings
+              <span className="currency-input">
+                <span>€</span>
+                <input
+                  aria-label="Monthly savings"
+                  inputMode="decimal"
+                  value={savings}
+                  onChange={(e) => setSavings(e.target.value)}
+                  required
+                />
+              </span>
+            </label>
+          </div>
+        </fieldset>
+      </section>
+      <section className="panel" aria-label="Monthly contributions">
+        <fieldset disabled={disabled}>
+          <dl className="plan-totals">
+            <div>
+              <dt>Operating budget</dt>
+              <dd data-testid="operating-target">
+                {money(plan.operatingMinor)}
+              </dd>
+            </div>
+            <div>
+              <dt>Total monthly target</dt>
+              <dd data-testid="total-target">
+                {validation ? '—' : money(plan.totalMinor)}
+              </dd>
+            </div>
+          </dl>
+          <div className="split-heading">
+            <h3>Member contributions</h3>
+            <span>50 / 50</span>
+          </div>
+          <div className="member-targets">
+            {document.memberNames.map((name, i) => (
+              <div key={i}>
+                <div>
+                  <span>{name}</span>
+                  <strong data-testid={`target-${i}`}>
+                    {validation ? '—' : money(plan.memberTargets[i])}
+                  </strong>
+                  <small>
+                    {money(plan.operatingShares[i])} operating ·{' '}
+                    {money(plan.savingsShares[i])} savings
+                  </small>
+                </div>
+              </div>
+            ))}
+          </div>
+          {validation && (
+            <p className="validation" role="alert">
+              {validation}
+            </p>
+          )}
+          <div className="form-footer">
+            <small>Targets are plans, not transferred funds.</small>
+            <button
+              type="button"
+              className="primary"
+              disabled={disabled || !dirty || !!validation || expenseTouched}
+              onClick={() => void commit(candidate)}
+            >
+              Save monthly plan
+            </button>
+          </div>
+          {expenseTouched && (
+            <p className="muted">
+              Add the expense to your plan or cancel it before saving.
+            </p>
+          )}
+        </fieldset>
+      </section>
+    </div>
   );
 }
 

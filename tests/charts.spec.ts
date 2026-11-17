@@ -174,6 +174,25 @@ test('overview uses a single member balance, compact due captions, separate pane
   await expect(
     page.getByRole('region', { name: 'Spending by category', exact: true }),
   ).toBeVisible();
+  await navigate(page, 'Monthly plan');
+  const recurring = page.getByRole('region', {
+    name: 'Recurring expenses',
+    exact: true,
+  });
+  const fixed = page.getByRole('region', {
+    name: 'Fixed savings',
+    exact: true,
+  });
+  await expect(
+    fixed.getByLabel('Monthly savings', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    recurring.getByLabel('Monthly savings', { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    recurring.getByRole('heading', { name: 'Fixed savings', exact: true }),
+  ).toHaveCount(0);
+  await navigate(page, 'Overview');
   for (const name of ['Overview', 'Monthly plan', 'Charts']) {
     const button = page
       .getByRole('navigation')
@@ -229,16 +248,32 @@ test('historical series reconcile spending, savings, operating funds and monthly
   for (const [metric, amount] of [
     ['savings', '€130.00'],
     ['operating', '€110.00'],
-    ['budget', '€100.00'],
   ]) {
     await panel.getByLabel('Chart series').selectOption(metric);
     await expect(page.getByTestId('chart-value')).toHaveText(amount);
+    await expect(panel.getByTestId('chart-target')).toHaveText(
+      metric === 'operating' ? '€100.00' : '€200.00',
+    );
+    await expect(panel.getByTestId('chart-funded')).toHaveText('€0.00');
+    await expect(panel.getByTestId('chart-funding-status')).toContainText(
+      'to the monthly funding goal',
+    );
     await expect(
       panel.getByRole('button', { name: 'Line', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true');
   }
+  await panel.getByLabel('Chart to date').fill('2026-02-28');
+  await expect(panel.getByTestId('chart-funded')).toHaveText('€50.00');
+  await expect(panel.getByTestId('chart-target')).toHaveText('€100.00');
+  await expect(panel.getByTestId('chart-funding-status')).toContainText(
+    '€50.00 to the monthly funding goal',
+  );
+  await expect(
+    panel.getByLabel('Chart series').locator('option[value="budget"]'),
+  ).toHaveCount(0);
+  await panel.getByLabel('Chart to date').fill('2026-03-31');
   await panel.getByRole('button', { name: 'Yearly', exact: true }).click();
-  await expect(page.getByTestId('chart-value')).toHaveText('€100.00');
+  await expect(page.getByTestId('chart-value')).toHaveText('€110.00');
   await panel.getByLabel('Chart series').selectOption('expenses');
   await expect(page.getByTestId('chart-value')).toHaveText('€130.00');
   await panel.getByRole('button', { name: 'Monthly', exact: true }).click();
@@ -343,4 +378,105 @@ test('charts remain usable at 320 pixels, adapt to light mode and reject invalid
   await expect(page.getByRole('alert')).toContainText('date range');
   await page.getByLabel('Chart from date').fill('2026-01-01');
   await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('the right value axis scales with a vertical drag without moving the time range or scrolling the page', async ({
+  page,
+  context,
+}, testInfo) => {
+  await seed(page);
+  await navigate(page, 'Charts');
+  await page.getByLabel('Chart series').selectOption('operating');
+  await page.getByText('Advanced options', { exact: true }).click();
+  const scale = page.getByTestId('chart-value-range');
+  await expect(scale).toContainText('€');
+  const before = await scale.textContent();
+  const timeRange = await page.getByTestId('chart-visible-range').textContent();
+  const plot = page.getByTestId('history-chart');
+  await plot.scrollIntoViewIfNeeded();
+  const box = (await plot.boundingBox())!,
+    x = box.x + box.width - 20,
+    y = box.y + 120;
+  const scroll = await page.evaluate(() => scrollY);
+  if (testInfo.project.name === 'mobile') {
+    const session = await context.newCDPSession(page);
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x, y, id: 1 }],
+    });
+    for (const delta of [20, 45, 70, 95])
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x, y: y + delta, id: 1 }],
+      });
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: [],
+    });
+    await session.detach();
+  } else {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y + 95, { steps: 6 });
+    await page.mouse.up();
+  }
+  await expect(scale).not.toHaveText(before!);
+  await expect(page.getByTestId('chart-visible-range')).toHaveText(timeRange!);
+  expect(Math.abs((await page.evaluate(() => scrollY)) - scroll)).toBeLessThan(
+    3,
+  );
+  await page
+    .getByRole('button', { name: 'Reset value scale', exact: true })
+    .click();
+  await expect(scale).toHaveText(before!);
+});
+
+test('overview category pie shows whole slices, filtered totals and a readable legend instead of progress bars', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 760 });
+  await seed(page);
+  await page.getByLabel('Planning month').fill('2026-01');
+  const category = page.getByRole('region', {
+    name: 'Spending by category',
+    exact: true,
+  });
+  await category.getByText('Spending by category', { exact: true }).click();
+  const pie = category.getByRole('img', {
+    name: 'Spending by category pie chart',
+    exact: true,
+  });
+  await expect(pie).toBeVisible();
+  await expect(pie.locator('circle')).toHaveCount(1);
+  await expect(category.getByRole('progressbar')).toHaveCount(0);
+  await expect(category.locator('figcaption')).toContainText('100%');
+  await expect(category.locator('figcaption')).toContainText('€80.00');
+  const history = page.getByRole('region', {
+    name: 'Expenses and payment history',
+    exact: true,
+  });
+  await history
+    .getByText('Expenses & payment history (6)', { exact: true })
+    .click();
+  await history.getByText('Filters', { exact: true }).click();
+  await history.getByLabel('History to date').fill('2026-03-31');
+  await expect(pie.locator('path')).toHaveCount(2);
+  await expect(category.locator('figcaption')).toContainText('€90.00');
+  await expect(category.locator('figcaption')).toContainText('€40.00');
+  await expect(category.locator('figcaption')).toContainText('69.2%');
+  await page.screenshot({
+    path: `test-results/${testInfo.project.name}-category-pie.png`,
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await history.getByLabel('History category').selectOption('Travel');
+  await expect(pie.locator('path')).toHaveCount(0);
+  await expect(pie.locator('circle')).toHaveCount(1);
+  await expect(category.locator('figcaption')).toContainText(
+    'Travel100%€40.00',
+  );
 });

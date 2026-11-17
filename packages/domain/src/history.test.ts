@@ -261,3 +261,64 @@ describe('historical spending and balance series', () => {
     ).toThrow('date range');
   });
 });
+
+it('compares monthly goals to confirmed funding without treating spending or withdrawals as lost funding', () => {
+  let doc = funded();
+  doc = confirmFundTransfer(
+    doc,
+    '2026-11',
+    1,
+    'savings',
+    '2026-11-20T12:00:00Z',
+  );
+  doc = appendEntries(doc, [
+    {
+      ...expense('spent-savings', '2026-11-21', 10000, 'household', [0, 0, 1]),
+      fund: 'savings',
+    },
+    {
+      id: 'move-funded',
+      kind: 'fund-movement',
+      date: '2026-11-22',
+      createdAt,
+      actor: 'a',
+      from: 'savings',
+      to: 'operating',
+      amountMinor: 5000,
+      note: 'Move funded savings',
+    },
+  ]);
+  const points = history(doc, 'savings', 'day', '2026-11-19', '2026-12-02');
+  expect(points[0]).toMatchObject({
+    amountMinor: 100000,
+    fundedMinor: 100000,
+    targetMinor: 200000,
+  });
+  expect(points[1]).toMatchObject({
+    amountMinor: 200000,
+    fundedMinor: 200000,
+    targetMinor: 200000,
+  });
+  expect(points[3]).toMatchObject({
+    amountMinor: 185000,
+    fundedMinor: 200000,
+    targetMinor: 200000,
+  });
+  expect(points.at(-1)).toMatchObject({
+    amountMinor: 185000,
+    fundedMinor: 0,
+    targetMinor: 200000,
+  });
+  expect(history(doc, 'operating')[0]).toMatchObject({
+    amountMinor: 55000,
+    fundedMinor: 50000,
+    targetMinor: 100000,
+  });
+  expect(
+    history(doc, 'savings', 'year', '2026-01-01', '2026-11-30')[0],
+  ).toMatchObject({
+    amountMinor: 185000,
+    fundedMinor: 200000,
+    targetMinor: 200000,
+  });
+});

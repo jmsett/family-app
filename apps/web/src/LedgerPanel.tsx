@@ -25,7 +25,7 @@ import type {
   SplitMode,
 } from '@family/shared';
 import { SignedMoney } from './SignedMoney';
-import { ProgressBar } from './ProgressBar';
+import { CategoryPie } from './CategoryPie';
 const money = (value: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(
     value / 100,
@@ -1185,28 +1185,7 @@ export function LedgerPanel({
           <span className="sr-only" data-testid="actual-spending-total">
             {money(total)}
           </span>
-          {spending.map((row) => {
-            const known = EXPENSE_CATEGORIES.indexOf(row.category);
-            const colorIndex =
-              known < 0
-                ? [...row.category].reduce(
-                    (sum, c) => sum + c.charCodeAt(0),
-                    0,
-                  ) % 6
-                : known;
-            return (
-              <div className="spending-row" key={row.category}>
-                <span>{row.category}</span>
-                <strong>{money(row.amountMinor)}</strong>
-                <ProgressBar
-                  label={`${row.category} actual spending`}
-                  value={total ? (row.amountMinor / total) * 100 : 0}
-                  chartIndex={colorIndex}
-                  valueText={money(row.amountMinor)}
-                />
-              </div>
-            );
-          })}
+          <CategoryPie spending={spending} />
           {!spending.length && (
             <p className="empty-copy">No recorded purchases in this range.</p>
           )}

@@ -8,6 +8,8 @@ export interface HistoryPoint {
   startDate: string;
   endDate: string;
   amountMinor: number;
+  fundedMinor?: number;
+  targetMinor?: number;
 }
 const DAY = 86400000;
 const epoch = (date: string) => Date.parse(`${date}T00:00:00Z`);
@@ -84,6 +86,8 @@ export function buildHistory(
     savings: number;
     household: number;
     spending: number;
+    operatingFunding: number;
+    savingsFunding: number;
   };
   const changes = new Map<string, Change>();
   const at = (date: string) => {
@@ -93,11 +97,17 @@ export function buildHistory(
         savings: 0,
         household: 0,
         spending: 0,
+        operatingFunding: 0,
+        savingsFunding: 0,
       });
     return changes.get(date)!;
   };
-  for (const t of doc.transfers)
-    at(contributionDate(t))[t.fund] += t.amountMinor;
+  for (const t of doc.transfers) {
+    const change = at(contributionDate(t));
+    change[t.fund] += t.amountMinor;
+    change[t.fund === 'operating' ? 'operatingFunding' : 'savingsFunding'] +=
+      t.amountMinor;
+  }
   for (const event of activeEntries(doc.ledger)) {
     const c = at(event.date);
     if (event.kind === 'expense') {
@@ -127,7 +137,11 @@ export function buildHistory(
     operating = 0,
     savings = 0,
     household = 0;
-  const budget = new Map<string, number>();
+  const plans = new Map<
+    string,
+    { operatingMinor: number; savingsMinor: number }
+  >();
+  const funding = new Map<string, { operating: number; savings: number }>();
   const result: HistoryPoint[] = [];
   let cursor = from;
   // Read each financial change once, including opening balances before the range.
@@ -140,11 +154,18 @@ export function buildHistory(
       operating += c.operating;
       savings += c.savings;
       household += c.household;
+      const month = date.slice(0, 7);
+      const funded = funding.get(month) ?? { operating: 0, savings: 0 };
+      funded.operating += c.operatingFunding;
+      funded.savings += c.savingsFunding;
+      funding.set(month, funded);
       if (date >= cursor) spending += c.spending;
     }
     const month = endDate.slice(0, 7);
-    if (metric === 'budget' && !budget.has(month))
-      budget.set(month, monthlyPlan(doc, month).operatingMinor);
+    if (metric !== 'expenses' && !plans.has(month)) {
+      const { operatingMinor, savingsMinor } = monthlyPlan(doc, month);
+      plans.set(month, { operatingMinor, savingsMinor });
+    }
     result.push({
       time: start,
       startDate: cursor,
@@ -156,7 +177,16 @@ export function buildHistory(
             ? savings
             : metric === 'operating'
               ? operating - Math.max(0, -household)
-              : budget.get(month)!,
+              : plans.get(month)!.operatingMinor,
+      ...(metric === 'operating' || metric === 'savings'
+        ? {
+            fundedMinor: funding.get(month)?.[metric] ?? 0,
+            targetMinor:
+              metric === 'operating'
+                ? plans.get(month)!.operatingMinor
+                : plans.get(month)!.savingsMinor,
+          }
+        : {}),
     });
     cursor = iso(epoch(endDate) + DAY);
   }

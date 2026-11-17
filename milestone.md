@@ -1,6 +1,16 @@
 # Milestones and owner review gates
 
-## Historical explorer and overview refinement — current review slice
+## Funding comparisons, value-axis touch scaling and category pie — current review slice
+
+**Status: implemented; owner review pending.**
+
+- Monthly plan now separates recurring costs, fixed savings and contributions into distinct panels with one save.
+- Savings and operating charts overlay available funds, confirmed monthly contributions and the monthly goal, with matching legend/status/table. Spending does not undo recorded funding; monthly comparisons reset while balances carry forward. The standalone budget selector is removed.
+- Native right-axis vertical dragging works on desktop and Android emulation without scrolling the page or changing time bounds. Plot swipes retain page scrolling. Advanced Reset value scale and All restore auto fitting.
+- Overview category spending uses the device palette in an SVG pie with exact values/percentages, including single-category, filtered and empty states.
+- Verification: 77 domain/API/sync tests, 34 desktop/Android workflows and six production PWA cases. New coverage checks funding versus spending, month resets/carryover, annual endpoint semantics, planning separation, right-axis gestures/reset, and pie totals/filters at 320 pixels. Actual phone interaction remains owner review.
+
+## Historical explorer and overview refinement — earlier review slice
 
 **Status: implemented; owner review pending.** Owner requested starting the historical explorer alongside the overview refinements.
 

@@ -5,6 +5,7 @@ import {
   HistogramSeries,
   LineSeries,
   LineType,
+  LineStyle,
   createChart,
   type IChartApi,
   type ISeriesApi,
@@ -24,9 +25,9 @@ import { formatMoney } from './SignedMoney';
 const METRICS = {
   expenses: 'Expenses',
   savings: 'Savings',
-  operating: 'Operating funds',
-  budget: 'Operating budget',
+  operating: 'Operating funds & goal',
 };
+type ChartMetric = Exclude<HistoryMetric, 'budget'>;
 const INTERVALS = [
   ['day', 'D', 'Daily'],
   ['week', 'W', 'Weekly'],
@@ -58,7 +59,7 @@ export default function HistoryPanel({
   today: string;
 }) {
   const appearance = useContext(AppearanceContext);
-  const [metric, setMetric] = useState<HistoryMetric>('expenses'),
+  const [metric, setMetric] = useState<ChartMetric>('expenses'),
     [interval, setInterval] = useState<HistoryInterval>('month');
   const [style, setStyle] = useState<'bars' | 'line'>('bars'),
     [category, setCategory] = useState(''),
@@ -73,6 +74,10 @@ export default function HistoryPanel({
       null,
     ),
     [valuePage, setValuePage] = useState(0);
+  const [valueRange, setValueRange] = useState<{
+    from: number;
+    to: number;
+  } | null>(null);
   const container = useRef<HTMLDivElement>(null),
     chartRef = useRef<IChartApi | null>(null);
   const rangeRef = useRef<{ from: number; to: number } | null>(null),
@@ -115,15 +120,24 @@ export default function HistoryPanel({
       ? appearance.savings[0]
       : metric === 'operating'
         ? appearance.operating[1]
-        : metric === 'budget'
-          ? appearance.accent
-          : appearance.chartColors[
-              (category
-                ? categoryIndex < 0
-                  ? [...category].reduce((sum, c) => sum + c.charCodeAt(0), 0)
-                  : categoryIndex
-                : 0) % appearance.chartColors.length
-            ];
+        : appearance.chartColors[
+            (category
+              ? categoryIndex < 0
+                ? [...category].reduce((sum, c) => sum + c.charCodeAt(0), 0)
+                : categoryIndex
+              : 0) % appearance.chartColors.length
+          ];
+  const fundedColor = appearance.chartColors[4 % appearance.chartColors.length];
+  const targetColor = appearance.accent;
+  function refreshValueRange() {
+    const range = chartRef.current?.priceScale('right').getVisibleRange();
+    setValueRange(range ? { from: range.from, to: range.to } : null);
+  }
+  function fitAll() {
+    chartRef.current?.priceScale('right').setAutoScale(true);
+    chartRef.current?.timeScale().fitContent();
+    requestAnimationFrame(refreshValueRange);
+  }
   const resetKey = `${metric}:${interval}:${from}:${to}:${category}:${style}`;
   useEffect(() => {
     const observer = new MutationObserver(() =>
@@ -172,7 +186,7 @@ export default function HistoryPanel({
       handleScale: {
         mouseWheel: true,
         pinch: true,
-        axisPressedMouseMove: { time: true, price: false },
+        axisPressedMouseMove: { time: true, price: true },
         axisDoubleClickReset: true,
       },
       localization: {
@@ -204,6 +218,37 @@ export default function HistoryPanel({
         ...(style === 'bars' && p.amountMinor < 0 ? { color: '#ffb546' } : {}),
       })),
     );
+    if (metric !== 'expenses') {
+      const funded = chart.addSeries(LineSeries, {
+        ...options,
+        color: fundedColor,
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        lineType: LineType.WithSteps,
+        crosshairMarkerVisible: true,
+      });
+      const target = chart.addSeries(LineSeries, {
+        ...options,
+        color: targetColor,
+        lineWidth: 2,
+        lineStyle: LineStyle.SparseDotted,
+        lineType: LineType.WithSteps,
+        crosshairMarkerVisible: true,
+      });
+      funded.setData(
+        points.map((p) => ({
+          time: p.time,
+          value: (p.fundedMinor ?? 0) / 100,
+        })),
+      );
+      target.setData(
+        points.map((p) => ({
+          time: p.time,
+          value: (p.targetMinor ?? 0) / 100,
+        })),
+      );
+    }
+    const scaleFrame = requestAnimationFrame(refreshValueRange);
     setHover(null);
     const last = Math.max(0, points.length - 1);
     if (keyRef.current === resetKey && rangeRef.current)
@@ -241,11 +286,24 @@ export default function HistoryPanel({
       ),
     );
     return () => {
+      cancelAnimationFrame(scaleFrame);
       rangeRef.current = chart.timeScale().getVisibleLogicalRange();
       chartRef.current = null;
       chart.remove();
     };
-  }, [points, selected, color, theme, style, grid, metric, interval, resetKey]);
+  }, [
+    points,
+    selected,
+    color,
+    fundedColor,
+    targetColor,
+    theme,
+    style,
+    grid,
+    metric,
+    interval,
+    resetKey,
+  ]);
   const readout = hover ?? points[visible?.last ?? points.length - 1];
   const visibleFrom = points[visible?.first ?? 0]?.startDate,
     visibleTo = points[visible?.last ?? points.length - 1]?.endDate;
@@ -279,9 +337,7 @@ export default function HistoryPanel({
   const empty =
     metric === 'expenses'
       ? !points.some((p) => p.amountMinor !== 0)
-      : metric === 'budget'
-        ? household.expenses.length === 0
-        : household.transfers.length === 0 && household.ledger.length === 0;
+      : !points.some((p) => p.amountMinor || p.fundedMinor || p.targetMinor);
   const rows = [...points].reverse().slice(valuePage * 30, valuePage * 30 + 30);
   return (
     <section className="panel history-explorer" aria-label="Historical charts">
@@ -292,7 +348,7 @@ export default function HistoryPanel({
             aria-label="Chart series"
             value={metric}
             onChange={(e) => {
-              const next = e.target.value as HistoryMetric;
+              const next = e.target.value as ChartMetric;
               setMetric(next);
               setStyle(next === 'expenses' ? 'bars' : 'line');
             }}
@@ -353,11 +409,50 @@ export default function HistoryPanel({
         <small>
           {metric === 'expenses'
             ? `Period spending${category ? ` · ${category}` : ''}`
-            : metric === 'budget'
-              ? 'Monthly operating target at interval end'
-              : 'Recorded balance at interval end'}
+            : 'Available balance at interval end'}
         </small>
       </div>
+      {metric !== 'expenses' && readout && (
+        <>
+          <div className="chart-funding-legend" aria-label="Fund chart legend">
+            <span>
+              <i style={{ borderColor: color }} aria-hidden="true" />
+              Available funds
+            </span>
+            <span>
+              <i
+                style={{ borderColor: fundedColor, borderTopStyle: 'dashed' }}
+                aria-hidden="true"
+              />
+              Funded in{' '}
+              {dateLabel(readout.endDate).split(' ').slice(1).join(' ')}{' '}
+              <strong data-testid="chart-funded">
+                {formatMoney(readout.fundedMinor ?? 0)}
+              </strong>
+            </span>
+            <span>
+              <i
+                style={{ borderColor: targetColor, borderTopStyle: 'dotted' }}
+                aria-hidden="true"
+              />
+              Monthly goal{' '}
+              <strong data-testid="chart-target">
+                {formatMoney(readout.targetMinor ?? 0)}
+              </strong>
+            </span>
+          </div>
+          <p
+            className="chart-funding-status"
+            data-testid="chart-funding-status"
+          >
+            {!(readout.targetMinor ?? 0)
+              ? 'No funding due for this month.'
+              : (readout.fundedMinor ?? 0) >= (readout.targetMinor ?? 0)
+                ? 'Monthly funding goal reached.'
+                : `${formatMoney((readout.targetMinor ?? 0) - (readout.fundedMinor ?? 0))} to the monthly funding goal.`}
+          </p>
+        </>
+      )}
       <div className="chart-controls">
         <div
           className="chart-intervals"
@@ -397,7 +492,7 @@ export default function HistoryPanel({
             aria-label="Fit all history"
             title="Fit all history"
             disabled={!points.length}
-            onClick={() => chartRef.current?.timeScale().fitContent()}
+            onClick={fitAll}
           >
             All
           </button>
@@ -418,6 +513,35 @@ export default function HistoryPanel({
         aria-label="History chart"
         aria-describedby="chart-instructions"
         tabIndex={0}
+        onTouchStartCapture={(event) => {
+          const chart = chartRef.current,
+            rect = container.current?.getBoundingClientRect();
+          if (!chart || !rect) return;
+          const touch = event.touches[0];
+          // The renderer also gates axis touch scaling on vertTouchDrag.
+          // Enable it only for a gesture starting on the right axis so the
+          // plot still allows normal vertical page scrolling.
+          const onAxis =
+            event.touches.length === 1 &&
+            touch.clientX >= rect.right - chart.priceScale('right').width();
+          chart.applyOptions({ handleScroll: { vertTouchDrag: onAxis } });
+        }}
+        onTouchEndCapture={() =>
+          requestAnimationFrame(() => {
+            chartRef.current?.applyOptions({
+              handleScroll: { vertTouchDrag: false },
+            });
+            refreshValueRange();
+          })
+        }
+        onTouchCancelCapture={() => {
+          chartRef.current?.applyOptions({
+            handleScroll: { vertTouchDrag: false },
+          });
+          requestAnimationFrame(refreshValueRange);
+        }}
+        onMouseUpCapture={() => requestAnimationFrame(refreshValueRange)}
+        onWheelCapture={() => requestAnimationFrame(refreshValueRange)}
         onKeyDown={(e) => {
           if (e.key === '+' || e.key === '=') {
             e.preventDefault();
@@ -430,7 +554,7 @@ export default function HistoryPanel({
             pan(e.key === 'ArrowLeft' ? -1 : 1);
           } else if (e.key === 'Home') {
             e.preventDefault();
-            chartRef.current?.timeScale().fitContent();
+            fitAll();
           }
         }}
       >
@@ -444,9 +568,7 @@ export default function HistoryPanel({
           <p className="chart-empty">
             {metric === 'expenses'
               ? 'No expenses in this range.'
-              : metric === 'budget'
-                ? 'No operating targets yet.'
-                : 'No recorded funds yet.'}
+              : 'No recorded funds or monthly goals yet.'}
           </p>
         )}
       </div>
@@ -528,12 +650,32 @@ export default function HistoryPanel({
           >
             Reset date range &amp; filters
           </button>
+          <div className="chart-scale-controls">
+            <output data-testid="chart-value-range">
+              {valueRange
+                ? `Value axis: ${formatMoney(Math.round(valueRange.from * 100))} – ${formatMoney(Math.round(valueRange.to * 100))}`
+                : 'Value axis: Auto'}
+            </output>
+            <button
+              className="text-button"
+              onClick={() => {
+                chartRef.current?.priceScale('right').setAutoScale(true);
+                requestAnimationFrame(refreshValueRange);
+              }}
+            >
+              Reset value scale
+            </button>
+          </div>
           <p className="muted">
             Drag horizontally to pan; pinch or scroll to zoom. Hold to inspect a
-            value. Keyboard: arrows to pan, +/− to zoom, Home to fit. Expenses
-            sum each interval; fund balances carry forward. Budget shows the
-            monthly target, including forecasts. Weekly intervals start Monday;
-            partial intervals use only the selected dates.
+            value. Drag up or down on the right value axis to scale it; Reset
+            value scale restores automatic fitting. Keyboard: arrows to pan, +/−
+            to zoom, Home to fit. Expenses sum each interval; fund balances
+            carry forward. Fund views compare available money, confirmed funding
+            in the month ending each interval, and that month's goal. Spending
+            and withdrawals reduce available funds without undoing a funding
+            confirmation. Weekly intervals start Monday; partial intervals use
+            only the selected dates.
           </p>
           <p className="muted">
             Contributions use their confirmation date within their planning
@@ -564,29 +706,39 @@ export default function HistoryPanel({
                 Older
               </button>
             </div>
-            <table>
-              <caption>{METRICS[metric]} · EUR</caption>
-              <thead>
-                <tr>
-                  <th>Period</th>
-                  <th>
-                    {metric === 'expenses'
-                      ? 'Spending'
-                      : metric === 'budget'
-                        ? 'Monthly target'
-                        : 'Closing balance'}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => (
-                  <tr key={p.time}>
-                    <td>{pointLabel(p)}</td>
-                    <td>{formatMoney(p.amountMinor)}</td>
+            <div className="chart-value-table">
+              <table>
+                <caption>{METRICS[metric]} · EUR</caption>
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>
+                      {metric === 'expenses' ? 'Spending' : 'Closing balance'}
+                    </th>
+                    {metric !== 'expenses' && (
+                      <>
+                        <th>Funded this month</th>
+                        <th>Monthly goal</th>
+                      </>
+                    )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map((p) => (
+                    <tr key={p.time}>
+                      <td>{pointLabel(p)}</td>
+                      <td>{formatMoney(p.amountMinor)}</td>
+                      {metric !== 'expenses' && (
+                        <>
+                          <td>{formatMoney(p.fundedMinor ?? 0)}</td>
+                          <td>{formatMoney(p.targetMinor ?? 0)}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </details>
           <a
             className="muted"
