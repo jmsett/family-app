@@ -45,6 +45,7 @@ function TripEditor({
     [flight, setFlight] = useState(
       inputAmount(original?.flightPerPersonMinor ?? 20000),
     );
+  const [other, setOther] = useState(inputAmount(original?.otherMinor ?? 0));
   const [extrasMode, setExtrasMode] = useState<'percentage' | 'fixed'>(
       original?.extrasMode ?? 'percentage',
     ),
@@ -79,6 +80,7 @@ function TripEditor({
         extrasMode === 'fixed'
           ? parseMoney(extras)
           : (original?.extrasMinor ?? 0),
+      otherMinor: parseMoney(other),
       allocatedMinor: original?.allocatedMinor ?? 0,
       photo,
       archived: original?.archived ?? false,
@@ -214,9 +216,14 @@ function TripEditor({
           {amountField('Hotel per night · 2 people (€)', hotel, setHotel)}
         </div>
         {amountField('Return flights per person (€)', flight, setFlight)}
+        {amountField('Other planned expenses · total (€)', other, setOther)}
+        <small>
+          One lump sum for both people: tours, activities or other planned
+          costs.
+        </small>
         <div className="input-row">
           <label>
-            Other expenses
+            Contingency
             <select
               aria-label="Trip extras method"
               value={extrasMode}
@@ -230,11 +237,11 @@ function TripEditor({
           </label>
           {extrasMode === 'percentage'
             ? amountField('Extra allowance (%)', extraPercent, setExtraPercent)
-            : amountField('Other trip expenses (€)', extras, setExtras)}
+            : amountField('Fixed contingency (€)', extras, setExtras)}
         </div>
         <small>
-          Start with 15% of food, hotel and flights. Adjust for local transport,
-          activities, baggage, insurance and surprises; this is an estimate.
+          The contingency is based on food, hotel and flights. Planned other
+          expenses are added separately, without increasing this allowance.
         </small>
         <details className="calculator-options">
           <summary>Destination picture</summary>
@@ -587,8 +594,12 @@ export function Travel({
                   <dd>{money(budget.flightsMinor)}</dd>
                 </div>
                 <div>
+                  <dt>Other planned expenses</dt>
+                  <dd>{money(budget.otherMinor)}</dd>
+                </div>
+                <div>
                   <dt>
-                    Other expenses
+                    Contingency
                     {trip.extrasMode === 'percentage'
                       ? ` · ${trip.extrasBasisPoints / 100}%`
                       : ''}

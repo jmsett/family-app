@@ -38,7 +38,8 @@ export function tripBudget(trip: TripGoal) {
     flightsMinor,
     baseMinor,
     extrasMinor,
-    totalMinor: baseMinor + extrasMinor,
+    otherMinor: trip.otherMinor,
+    totalMinor: baseMinor + extrasMinor + trip.otherMinor,
   };
 }
 export function validateTrips(trips: TripGoal[]): void {
@@ -93,6 +94,7 @@ export function validateTrips(trips: TripGoal[]): void {
         t.hotelPerNightMinor,
         t.flightPerPersonMinor,
         t.extrasMinor,
+        t.otherMinor,
         t.allocatedMinor,
       ].some((n) => !Number.isSafeInteger(n) || n < 0 || n > MAX_MINOR) ||
       !['percentage', 'fixed'].includes(t.extrasMode) ||

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "revision": 0,
   "memberNames": ["Alex (sample)", "Sam (sample)"],
   "expenses": [
@@ -86,6 +86,7 @@
       "extrasMode": "percentage",
       "extrasBasisPoints": 1500,
       "extrasMinor": 0,
+      "otherMinor": 0,
       "allocatedMinor": 65000,
       "photo": null,
       "archived": false
@@ -104,6 +105,7 @@
       "extrasMode": "percentage",
       "extrasBasisPoints": 1500,
       "extrasMinor": 0,
+      "otherMinor": 0,
       "allocatedMinor": 95000,
       "photo": null,
       "archived": false

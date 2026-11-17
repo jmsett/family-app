@@ -92,7 +92,7 @@ describe('household GitHub format', () => {
     expect(result?.document.expenses).toEqual([]);
     expect(result?.document.transfers).toEqual([]);
   });
-  it('round trips schema v7, preserves Unicode, uses SHA and excludes secrets', async () => {
+  it('round trips schema v8, preserves Unicode, uses SHA and excludes secrets', async () => {
     let encoded = '';
     const doc = { ...base, memberNames: ['José', '愛'] as [string, string] };
     const fetcher = vi
@@ -355,6 +355,7 @@ it('preserves trip labels and photos, blocks concurrent allocations and retains 
     extrasMode: 'percentage' as const,
     extrasBasisPoints: 1500,
     extrasMinor: 0,
+    otherMinor: 0,
     allocatedMinor: 0,
     photo: 'data:image/jpeg;base64,/9j/2Q==',
     archived: false,

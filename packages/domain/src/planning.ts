@@ -41,7 +41,7 @@ function amount(value: number) {
 }
 export function initialHousehold(): HouseholdPlan {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     revision: 0,
     memberNames: ['Member A', 'Member B'],
     expenses: [],
@@ -119,7 +119,7 @@ export function dueDate(
 export function validateHousehold(doc: HouseholdPlan): void {
   if (
     !doc ||
-    doc.schemaVersion !== 7 ||
+    doc.schemaVersion !== 8 ||
     !Number.isSafeInteger(doc.revision) ||
     doc.revision < 0 ||
     !Array.isArray(doc.expenses) ||
@@ -543,6 +543,7 @@ export function canonicalHousehold(doc: HouseholdPlan): string {
         extrasMode: t.extrasMode,
         extrasBasisPoints: t.extrasBasisPoints,
         extrasMinor: t.extrasMinor,
+        otherMinor: t.otherMinor,
         allocatedMinor: t.allocatedMinor,
         photo: t.photo,
         archived: t.archived,
@@ -649,6 +650,14 @@ export function upgradeHousehold(value: unknown): HouseholdPlan {
     next = { ...next, schemaVersion: 6, incomes: [], fundingRules: [] };
   }
   if (next.schemaVersion === 6) next = { ...next, schemaVersion: 7, trips: [] };
+  if (next.schemaVersion === 7) {
+    if (!Array.isArray(next.trips)) throw new Error('Invalid trip data.');
+    next = {
+      ...next,
+      schemaVersion: 8,
+      trips: next.trips.map((t) => ({ ...t, otherMinor: 0 })),
+    };
+  }
   validateHousehold(next as unknown as HouseholdPlan);
   return next as unknown as HouseholdPlan;
 }

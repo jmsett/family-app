@@ -56,7 +56,7 @@ export async function readRecord(): Promise<LocalRecord> {
             tx.abort();
             return;
           }
-          if (oldVersion !== 7) {
+          if (oldVersion !== 8) {
             record.pending = true;
             store.put(record, 'current');
           }

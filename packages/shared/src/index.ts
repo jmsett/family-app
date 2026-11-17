@@ -51,7 +51,7 @@ export interface FundingRetraction {
   retractedAt: string;
 }
 export interface HouseholdPlan {
-  schemaVersion: 7;
+  schemaVersion: 8;
   revision: number;
   memberNames: [string, string];
   expenses: RecurringExpense[];
@@ -78,6 +78,7 @@ export interface TripGoal {
   extrasMode: 'percentage' | 'fixed';
   extrasBasisPoints: number;
   extrasMinor: number;
+  otherMinor: number;
   allocatedMinor: number;
   photo: string | null;
   archived: boolean;

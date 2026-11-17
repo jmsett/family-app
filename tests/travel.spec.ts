@@ -16,6 +16,10 @@ test('joint trip goals budget dates, earmark savings once, retain photos and lab
     '5',
   );
   await expect(page.getByTestId('trip-budget-preview')).toHaveText('€1,518.00');
+  await page
+    .getByLabel('Other planned expenses · total (€)', { exact: true })
+    .fill('250');
+  await expect(page.getByTestId('trip-budget-preview')).toHaveText('€1,768.00');
   // A valid tiny image exercises the real upload/compression path without external photos.
   const photo = await page.evaluate(() => {
     const c = document.createElement('canvas');
@@ -49,7 +53,7 @@ test('joint trip goals budget dates, earmark savings once, retain photos and lab
   await card
     .getByRole('button', { name: 'Allocate savings', exact: true })
     .click();
-  await page.getByLabel('Trip allocated savings', { exact: true }).fill('759');
+  await page.getByLabel('Trip allocated savings', { exact: true }).fill('884');
   await page
     .getByRole('button', { name: 'Save allocation', exact: true })
     .click();
@@ -58,6 +62,9 @@ test('joint trip goals budget dates, earmark savings once, retain photos and lab
     '50',
   );
   await card.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(
+    page.getByLabel('Other planned expenses · total (€)', { exact: true }),
+  ).toHaveValue('250.00');
   await page.getByLabel('Trip name', { exact: true }).fill('Rome spring');
   await page.getByRole('button', { name: 'Save trip', exact: true }).click();
   const renamed = page.getByRole('region', {

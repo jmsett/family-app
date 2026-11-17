@@ -28,6 +28,7 @@ const trip = (id = 'trip-1'): TripGoal => ({
   extrasMode: 'percentage',
   extrasBasisPoints: 1500,
   extrasMinor: 0,
+  otherMinor: 0,
   allocatedMinor: 0,
   photo: null,
   archived: false,
@@ -81,6 +82,32 @@ describe('trip budgets and joint savings earmarks', () => {
         nights: 0,
       }).days,
     ).toBe(1);
+  });
+  it('adds a planned lump sum once for both people without multiplying or changing contingency', () => {
+    expect(tripBudget({ ...trip(), otherMinor: 25000 })).toMatchObject({
+      extrasMinor: 22350,
+      otherMinor: 25000,
+      totalMinor: 196350,
+    });
+    expect(
+      tripBudget({
+        ...trip(),
+        extrasMode: 'fixed',
+        extrasMinor: 10000,
+        otherMinor: 25000,
+      }).totalMinor,
+    ).toBe(184000);
+    for (const otherMinor of [-1, 1.5, NaN, 100000000])
+      expect(() => validateTrips([{ ...trip(), otherMinor }])).toThrow();
+  });
+  it('migrates schema7 trip budgets with zero other expenses, preserving allocations and photos', () => {
+    const doc = funded();
+    const old = {
+      ...doc,
+      schemaVersion: 7,
+      trips: doc.trips.map((t) => ({ ...t, otherMinor: undefined })),
+    };
+    expect(upgradeHousehold(old)).toEqual(doc);
   });
   it('rejects invalid dates, durations, photos, duplicate labels and excessive money', () => {
     for (const bad of [

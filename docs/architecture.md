@@ -1,5 +1,11 @@
 # Foundation decisions and API contract
 
+## ADR 020: Planned lump-sum trip costs alongside contingency
+
+Owner requested an additional total for tours and other planned expenses. Schema 8 adds required integer-cent `TripGoal.otherMinor`; schema-7 trips migrate with zero to preserve previous budgets, allocations, labels and photos. Earlier migrations chain through that upgrade. Canonical serialization, decoding and sync include the field; old clients reject the newer schema rather than drop the planned amount.
+
+Trip total = food for both travelers + hotel + both return fares + existing percentage/fixed contingency + planned other expenses. The new amount is a total for both travelers, added once with no day/person multiplier and no automatic contingency applied to it. Label existing allowance controls and breakdown as Contingency, display Other planned expenses independently, and preserve the new field on edit/reload. Test positive/invalid amounts, unchanged contingency, zero-default migration, phone/desktop forms and production offline/two-device synchronization.
+
 ## ADR 019: Travel goals earmark joint savings
 
 Owner clarified that goals use the joint confirmed savings fund, with one goal progress bar. Schema 7 adds `trips`: stable ID/name/label, optional date pair, estimated duration and hotel nights, cent-denominated food/hotel/return flights/extras, percentage-or-fixed extras mode, planned total allocation, optional small JPEG and archive state. Budget uses two travelers, inclusive food days and independently editable hotel nights. Name-derived labels include an ID suffix, stay stable through rename/archive and are retained by storage/sync. Schemas 2–6 migrate to an empty trip list, preserving all existing money/income/identity/credential stores.
