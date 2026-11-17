@@ -2034,3 +2034,7 @@ nav button.nav-icon {
   min-width: 0;
   max-width: 100%;
 }
+.retracted-contribution > strong {
+  opacity: 0.6;
+  text-decoration: line-through;
+}

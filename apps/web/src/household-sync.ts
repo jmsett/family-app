@@ -17,7 +17,12 @@ export interface RemoteHousehold {
 const same = (a: HouseholdPlan, b: HouseholdPlan) =>
   canonicalHousehold(a) === canonicalHousehold(b);
 const config = (doc: HouseholdPlan) =>
-  canonicalHousehold({ ...doc, transfers: [], ledger: [] });
+  canonicalHousehold({
+    ...doc,
+    transfers: [],
+    transferRetractions: [],
+    ledger: [],
+  });
 export function reconcile(
   local: LocalRecord,
   remote: RemoteHousehold | null,
@@ -52,10 +57,21 @@ export function reconcile(
       );
     if (!existing) transfers.set(transfer.id, transfer);
   }
+  const retractions = new Map(
+    remote.document.transferRetractions.map((r) => [r.id, r]),
+  );
+  for (const entry of local.document.transferRetractions) {
+    const existing = retractions.get(entry.id);
+    if (!existing || entry.retractedAt < existing.retractedAt)
+      retractions.set(entry.id, entry);
+  }
   result = {
     ...result,
     transfers: [...transfers.values()].sort((a, b) => a.id.localeCompare(b.id)),
     ledger: mergeLedger(local.document.ledger, remote.document.ledger),
+    transferRetractions: [...retractions.values()].sort((a, b) =>
+      a.id.localeCompare(b.id),
+    ),
   };
   validateHousehold(result);
   return result;
@@ -65,7 +81,7 @@ export { same as sameHousehold };
 export function decodeHousehold(value: unknown): HouseholdPlan {
   const doc = upgradeHousehold(value);
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     revision: doc.revision,
     memberNames: [doc.memberNames[0], doc.memberNames[1]],
     expenses: doc.expenses.map((e) => ({
@@ -89,6 +105,13 @@ export function decodeHousehold(value: unknown): HouseholdPlan {
       fund: t.fund,
       amountMinor: t.amountMinor,
       confirmedAt: t.confirmedAt,
+      generation: t.generation,
+    })),
+    transferRetractions: doc.transferRetractions.map((r) => ({
+      id: r.id,
+      confirmationId: r.confirmationId,
+      member: r.member,
+      retractedAt: r.retractedAt,
     })),
     ledger: doc.ledger.map((event) => JSON.parse(canonicalEvent(event))),
     legacyDrafts: doc.legacyDrafts.map((d) => ({

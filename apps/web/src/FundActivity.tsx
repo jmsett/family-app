@@ -47,6 +47,9 @@ export function FundActivity({
     validation = (error as Error).message;
     candidate = null;
   }
+  const retractions = new Map(
+    document.transferRetractions.map((r) => [r.confirmationId, r]),
+  );
   return (
     <details className="panel fund-activity">
       <summary>Fund activity</summary>
@@ -197,15 +200,22 @@ export function FundActivity({
               (a, b) =>
                 b.month.localeCompare(a.month) ||
                 a.member - b.member ||
-                a.fund.localeCompare(b.fund),
+                a.fund.localeCompare(b.fund) ||
+                b.generation - a.generation,
             )
             .map((t) => (
-              <div className="transfer-row" key={t.id}>
+              <div
+                className={`transfer-row ${retractions.has(t.id) ? 'retracted-contribution' : ''}`}
+                key={t.id}
+              >
                 <div>
                   <strong>{document.memberNames[t.member]}</strong>
                   <small>
                     {t.month} · {t.fund} ·{' '}
                     {new Date(t.confirmedAt).toLocaleDateString()}
+                    {retractions.has(t.id)
+                      ? ` · Retracted ${new Date(retractions.get(t.id)!.retractedAt).toLocaleDateString()}`
+                      : ' · Confirmed'}
                   </small>
                 </div>
                 <strong>{formatMoney(t.amountMinor)}</strong>

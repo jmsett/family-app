@@ -91,7 +91,7 @@ describe('household GitHub format', () => {
     expect(result?.document.expenses).toEqual([]);
     expect(result?.document.transfers).toEqual([]);
   });
-  it('round trips schema v4, preserves Unicode, uses SHA and excludes secrets', async () => {
+  it('round trips schema v5, preserves Unicode, uses SHA and excludes secrets', async () => {
     let encoded = '';
     const doc = { ...base, memberNames: ['José', '愛'] as [string, string] };
     const fetcher = vi
@@ -187,4 +187,89 @@ it('merges independent operating/savings declarations for the same member and pr
     reconcile(local({ document: merged }), { document: base, sha: 'c' }, true)
       .transfers,
   ).toEqual(merged.transfers);
+});
+
+it('merges a retraction with a stale device without resurrecting funds, including remote recovery', async () => {
+  const { retractFundTransfer, activeTransfers, monthlyPlan } =
+    await import('@family/domain');
+  const funded = confirmTransfer(base, '2030-01', 0, '2030-01-02T12:00:00Z');
+  const retracted = retractFundTransfer(
+    funded,
+    funded.transfers[0].id,
+    0,
+    '2030-01-03T12:00:00Z',
+  );
+  for (const recover of [false, true]) {
+    const merged = reconcile(
+      local({ document: retracted, base: funded }),
+      { document: funded, sha: 'stale' },
+      recover,
+    );
+    expect(activeTransfers(merged)).toHaveLength(0);
+    expect(merged.transfers).toHaveLength(1);
+    expect(merged.transferRetractions).toHaveLength(1);
+    expect(monthlyPlan(merged, '2030-01').confirmedSavingsMinor).toBe(0);
+  }
+  const pulled = reconcile(
+    local({ document: funded, base: funded, pending: false }),
+    { document: retracted, sha: 'new' },
+  );
+  expect(activeTransfers(pulled)).toHaveLength(0);
+});
+it('deduplicates concurrent retractions and reconfirmations deterministically', async () => {
+  const {
+    retractFundTransfer,
+    confirmFundTransfer,
+    activeTransfers,
+    canonicalHousehold,
+  } = await import('@family/domain');
+  const funded = confirmTransfer(base, '2030-01', 0, '2030-01-02T12:00:00Z');
+  const a = retractFundTransfer(
+    funded,
+    funded.transfers[0].id,
+    0,
+    '2030-01-03T12:00:00Z',
+  );
+  const b = retractFundTransfer(
+    funded,
+    funded.transfers[0].id,
+    0,
+    '2030-01-03T13:00:00Z',
+  );
+  const merged = reconcile(local({ document: a, base: funded }), {
+    document: b,
+    sha: 'b',
+  });
+  expect(merged.transferRetractions).toHaveLength(1);
+  expect(merged.transferRetractions[0].retractedAt).toBe(
+    '2030-01-03T12:00:00Z',
+  );
+  const ac = confirmFundTransfer(
+    merged,
+    '2030-01',
+    0,
+    'savings',
+    '2030-01-04T12:00:00Z',
+  );
+  const bc = confirmFundTransfer(
+    merged,
+    '2030-01',
+    0,
+    'savings',
+    '2030-01-04T12:00:00Z',
+  );
+  const confirmed = reconcile(local({ document: ac, base: merged }), {
+    document: bc,
+    sha: 'c',
+  });
+  expect(activeTransfers(confirmed)).toHaveLength(1);
+  expect(confirmed.transfers).toHaveLength(2);
+  expect(canonicalHousehold(decodeHousehold(confirmed))).toBe(
+    canonicalHousehold(confirmed),
+  );
+  const staleRetraction = reconcile(local({ document: b, base: funded }), {
+    document: confirmed,
+    sha: 'c',
+  });
+  expect(activeTransfers(staleRetraction)[0].generation).toBe(1);
 });

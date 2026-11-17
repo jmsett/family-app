@@ -42,14 +42,22 @@ export interface TransferConfirmation {
   fund: Fund;
   amountMinor: number;
   confirmedAt: string;
+  generation: number;
+}
+export interface FundingRetraction {
+  id: string;
+  confirmationId: string;
+  member: 0 | 1;
+  retractedAt: string;
 }
 export interface HouseholdPlan {
-  schemaVersion: 4;
+  schemaVersion: 5;
   revision: number;
   memberNames: [string, string];
   expenses: RecurringExpense[];
   savingsTargets: { month: string; amountMinor: number }[];
   transfers: TransferConfirmation[];
+  transferRetractions: FundingRetraction[];
   legacyDrafts: BudgetDraft[];
   ledger: LedgerEvent[];
 }

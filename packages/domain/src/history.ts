@@ -1,6 +1,6 @@
 import type { HouseholdPlan } from '@family/shared';
 import { activeEntries, effectivePayer } from './ledger';
-import { monthlyPlan, validDate } from './planning';
+import { activeTransfers, monthlyPlan, validDate } from './planning';
 export type HistoryMetric = 'expenses' | 'savings' | 'operating' | 'budget';
 export type HistoryInterval = 'day' | 'week' | 'month' | 'year';
 export interface HistoryPoint {
@@ -102,7 +102,7 @@ export function buildHistory(
       });
     return changes.get(date)!;
   };
-  for (const t of doc.transfers) {
+  for (const t of activeTransfers(doc)) {
     const change = at(contributionDate(t));
     change[t.fund] += t.amountMinor;
     change[t.fund === 'operating' ? 'operatingFunding' : 'savingsFunding'] +=

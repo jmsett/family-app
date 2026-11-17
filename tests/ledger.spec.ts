@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { navigate } from './helpers';
+import { confirm, navigate } from './helpers';
 async function identity(page: Page) {
   await navigate(page, 'Settings');
   await page.getByLabel('Your identity').selectOption('0');
@@ -428,4 +428,86 @@ test('funds confirm independently, zero shares need no transfer, and savings mov
     }),
   ).toHaveCount(0);
   await expect(page.getByTestId('savings-funds')).toHaveText('€65.00');
+});
+
+test('confirmed funding toggles back to pending, preserves the other fund and can be confirmed again', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await identity(page);
+  await navigate(page, 'Monthly plan');
+  await page.getByRole('button', { name: 'Add recurring expense' }).click();
+  await page.getByLabel('Expense name', { exact: true }).fill('Bills');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('100');
+  await page.getByRole('button', { name: 'Add to plan' }).click();
+  await page.getByLabel('Monthly savings', { exact: true }).fill('200');
+  await page.getByRole('button', { name: 'Save monthly plan' }).click();
+  await confirm(page, '0');
+  await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
+  const retract = page.getByRole('button', {
+    name: 'Retract my operating confirmation',
+    exact: true,
+  });
+  await expect(retract).toBeEnabled();
+  await expect(retract).toHaveAttribute('aria-pressed', 'true');
+  page.once('dialog', (d) => d.dismiss());
+  await retract.click();
+  await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
+  page.once('dialog', (d) => {
+    expect(d.message()).toContain('Retract €50.00 operating confirmation');
+    void d.accept();
+  });
+  await retract.click();
+  await expect(page.getByTestId('operating-funds')).toHaveText('€0.00');
+  await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
+  await expect(
+    page.getByRole('button', {
+      name: 'Confirm my operating transfer',
+      exact: true,
+    }),
+  ).toHaveAttribute('aria-pressed', 'false');
+  await page.getByText('Fund activity', { exact: true }).click();
+  await expect(page.locator('.retracted-contribution')).toHaveCount(1);
+  await expect(page.locator('.retracted-contribution')).toContainText(
+    'Retracted',
+  );
+  await navigate(page, 'Charts');
+  await page.getByLabel('Chart series').selectOption('operating');
+  await expect(page.getByTestId('chart-funded')).toHaveText('€0.00');
+  await expect(page.getByTestId('chart-value')).toHaveText('€0.00');
+  await expect(page.getByTestId('chart-target')).toHaveText('€100.00');
+  await page.reload();
+  await expect(page.getByTestId('operating-funds')).toHaveText('€0.00');
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Confirm my operating transfer', exact: true })
+    .click();
+  await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
+  await page.getByText('Fund activity', { exact: true }).click();
+  await expect(page.locator('.retracted-contribution')).toHaveCount(1);
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', {
+      name: 'Retract my savings confirmation',
+      exact: true,
+    })
+    .click();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€0.00');
+  await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
+  await navigate(page, 'Settings');
+  await page.getByLabel('Your identity').selectOption('1');
+  await navigate(page, 'Overview');
+  await expect(
+    page.getByRole('button', {
+      name: 'Member A: operating confirmed €50.00',
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole('button', {
+      name: 'Retract my operating confirmation',
+      exact: true,
+    }),
+  ).toHaveCount(0);
 });

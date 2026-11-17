@@ -218,7 +218,7 @@ describe('independent fund confirmations and legacy upgrades', () => {
       ],
     };
     const migrated = upgradeHousehold(old);
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.transfers.map((t) => [t.fund, t.amountMinor])).toEqual([
       ['operating', 40000],
       ['savings', 10000],
@@ -238,5 +238,174 @@ describe('independent fund confirmations and legacy upgrades', () => {
         transfers: [{ ...old.transfers[0], savingsMinor: -1 }],
       }),
     ).toThrow();
+  });
+});
+
+describe('retractable funding confirmations', () => {
+  it('retracts one fund without changing the original record, other fund or other member', async () => {
+    const {
+      confirmFundTransfer,
+      retractFundTransfer,
+      activeTransfers,
+      recordedFunds,
+      buildHistory,
+    } = await import('./index');
+    let doc = confirmTransfer(
+      household(),
+      '2030-01',
+      0,
+      '2030-01-02T12:00:00Z',
+    );
+    doc = confirmFundTransfer(
+      doc,
+      '2030-01',
+      1,
+      'operating',
+      '2030-01-03T12:00:00Z',
+    );
+    const original = doc.transfers[0];
+    const next = retractFundTransfer(
+      doc,
+      original.id,
+      0,
+      '2030-01-05T12:00:00Z',
+    );
+    expect(next.transfers).toEqual(doc.transfers);
+    expect(next.transferRetractions).toHaveLength(1);
+    expect(activeTransfers(next)).toHaveLength(2);
+    expect(monthlyPlan(next, '2030-01')).toMatchObject({
+      confirmedOperatingMinor: 40001,
+      confirmedSavingsMinor: 10000,
+    });
+    expect(recordedFunds(next, '2030-01')).toMatchObject({
+      operatingMinor: 40001,
+      savingsMinor: 10000,
+    });
+    expect(
+      buildHistory(next, {
+        metric: 'operating',
+        interval: 'month',
+        from: '2030-01-01',
+        to: '2030-01-31',
+      })[0],
+    ).toMatchObject({ amountMinor: 40001, fundedMinor: 40001 });
+    expect(
+      retractFundTransfer(next, original.id, 0, '2030-01-06T12:00:00Z'),
+    ).toEqual(next);
+    expect(() =>
+      retractFundTransfer(doc, original.id, 1, '2030-01-05T12:00:00Z'),
+    ).toThrow('only your own');
+  });
+  it('allows repeated confirm/retract cycles, capturing the current amount only once per generation', async () => {
+    const { confirmFundTransfer, retractFundTransfer, fundingStatus } =
+      await import('./index');
+    let doc = confirmFundTransfer(
+      household(),
+      '2030-01',
+      0,
+      'savings',
+      '2030-01-02T12:00:00Z',
+    );
+    const first = doc.transfers[0];
+    doc = retractFundTransfer(doc, first.id, 0, '2030-01-03T12:00:00Z');
+    expect(fundingStatus(doc, '2030-01', 0, 'savings')).toMatchObject({
+      complete: false,
+      notRequired: false,
+    });
+    doc = {
+      ...doc,
+      savingsTargets: [{ month: '2030-01', amountMinor: 30000 }],
+    };
+    doc = confirmFundTransfer(
+      doc,
+      '2030-01',
+      0,
+      'savings',
+      '2030-01-04T12:00:00Z',
+    );
+    expect(doc.transfers).toHaveLength(2);
+    expect(doc.transfers[0]).toEqual(first);
+    expect(doc.transfers[1]).toMatchObject({
+      id: '2030-01:0:savings:1',
+      generation: 1,
+      amountMinor: 15000,
+    });
+    doc = retractFundTransfer(
+      doc,
+      doc.transfers[1].id,
+      0,
+      '2030-01-05T12:00:00Z',
+    );
+    doc = confirmFundTransfer(
+      doc,
+      '2030-01',
+      0,
+      'savings',
+      '2030-01-06T12:00:00Z',
+    );
+    expect(
+      fundingStatus(doc, '2030-01', 0, 'savings').confirmation?.generation,
+    ).toBe(2);
+    expect(monthlyPlan(doc, '2030-01').confirmedSavingsMinor).toBe(15000);
+    expect(doc.transferRetractions).toHaveLength(2);
+  });
+  it('rejects dangling retractions and confirmations that skip a retraction', async () => {
+    const { confirmFundTransfer, retractFundTransfer } =
+      await import('./index');
+    const doc = confirmFundTransfer(
+      household(),
+      '2030-01',
+      0,
+      'savings',
+      '2030-01-02T12:00:00Z',
+    );
+    expect(() =>
+      validateHousehold({
+        ...doc,
+        transfers: [
+          ...doc.transfers,
+          { ...doc.transfers[0], id: '2030-01:0:savings:1', generation: 1 },
+        ],
+      }),
+    ).toThrow('must follow');
+    const next = retractFundTransfer(
+      doc,
+      doc.transfers[0].id,
+      0,
+      '2030-01-03T12:00:00Z',
+    );
+    expect(() => validateHousehold({ ...next, transfers: [] })).toThrow(
+      'retraction',
+    );
+    expect(() =>
+      validateHousehold({
+        ...next,
+        transferRetractions: [{ ...next.transferRetractions[0], member: 1 }],
+      }),
+    ).toThrow('retraction');
+  });
+  it('upgrades schema4 without inventing a retraction or changing recorded amounts', async () => {
+    const { upgradeHousehold, confirmFundTransfer } = await import('./index');
+    const current = confirmFundTransfer(
+      household(),
+      '2030-01',
+      0,
+      'savings',
+      '2030-01-02T12:00:00Z',
+    );
+    const legacy = {
+      ...current,
+      schemaVersion: 4,
+      transferRetractions: undefined,
+      transfers: current.transfers.map((t) => ({
+        id: t.id,
+        month: t.month,
+        member: t.member,
+        fund: t.fund,
+        amountMinor: t.amountMinor,
+        confirmedAt: t.confirmedAt,
+      })),
+    };
+    expect(upgradeHousehold(legacy)).toEqual(current);
   });
 });

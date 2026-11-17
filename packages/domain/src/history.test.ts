@@ -210,6 +210,7 @@ describe('historical spending and balance series', () => {
   it('clamps confirmation dates within their assigned month, using household local dates', () => {
     const base = {
       id: '2026-11:0:savings',
+      generation: 0,
       member: 0 as const,
       fund: 'savings' as const,
       amountMinor: 10000,

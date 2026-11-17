@@ -39,12 +39,13 @@ function amount(value: number) {
 }
 export function initialHousehold(): HouseholdPlan {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     revision: 0,
     memberNames: ['Member A', 'Member B'],
     expenses: [],
     savingsTargets: [],
     transfers: [],
+    transferRetractions: [],
     legacyDrafts: [],
     ledger: [],
   };
@@ -113,12 +114,13 @@ export function dueDate(
 export function validateHousehold(doc: HouseholdPlan): void {
   if (
     !doc ||
-    doc.schemaVersion !== 4 ||
+    doc.schemaVersion !== 5 ||
     !Number.isSafeInteger(doc.revision) ||
     doc.revision < 0 ||
     !Array.isArray(doc.expenses) ||
     !Array.isArray(doc.savingsTargets) ||
     !Array.isArray(doc.transfers) ||
+    !Array.isArray(doc.transferRetractions) ||
     !Array.isArray(doc.legacyDrafts) ||
     !Array.isArray(doc.ledger)
   )
@@ -134,6 +136,7 @@ export function validateHousehold(doc: HouseholdPlan): void {
   if (
     doc.expenses.length > 1000 ||
     doc.transfers.length > 5000 ||
+    doc.transferRetractions.length > 5000 ||
     doc.savingsTargets.length > 1212 ||
     doc.legacyDrafts.length > 1212
   )
@@ -158,7 +161,16 @@ export function validateHousehold(doc: HouseholdPlan): void {
       !validMonth(transfer.month) ||
       ![0, 1].includes(transfer.member) ||
       !(['operating', 'savings'] as string[]).includes(transfer.fund) ||
-      transfer.id !== `${transfer.month}:${transfer.member}:${transfer.fund}` ||
+      !Number.isSafeInteger(transfer.generation) ||
+      transfer.generation < 0 ||
+      transfer.generation > 5000 ||
+      transfer.id !==
+        confirmationId(
+          transfer.month,
+          transfer.member,
+          transfer.fund,
+          transfer.generation,
+        ) ||
       ids.has(transfer.id) ||
       typeof transfer.confirmedAt !== 'string' ||
       !Number.isFinite(Date.parse(transfer.confirmedAt))
@@ -169,6 +181,34 @@ export function validateHousehold(doc: HouseholdPlan): void {
       throw new Error('A transfer must contain a positive amount.');
     ids.add(transfer.id);
   }
+  const confirmations = new Map(doc.transfers.map((t) => [t.id, t]));
+  const retracted = new Set<string>();
+  for (const entry of doc.transferRetractions) {
+    const target = entry && confirmations.get(entry.confirmationId);
+    if (
+      !target ||
+      entry.id !== `retract:${target.id}` ||
+      entry.member !== target.member ||
+      retracted.has(target.id) ||
+      typeof entry.retractedAt !== 'string' ||
+      !Number.isFinite(Date.parse(entry.retractedAt))
+    )
+      throw new Error('Invalid or duplicate funding retraction.');
+    retracted.add(target.id);
+  }
+  for (const transfer of doc.transfers)
+    if (transfer.generation > 0) {
+      const previous = confirmationId(
+        transfer.month,
+        transfer.member,
+        transfer.fund,
+        transfer.generation - 1,
+      );
+      if (!confirmations.has(previous) || !retracted.has(previous))
+        throw new Error(
+          'A new funding confirmation must follow a retracted confirmation.',
+        );
+    }
   for (const draft of doc.legacyDrafts) validateDraft(draft);
   validateLedger(doc.ledger);
   // Validate aggregate limits, including forecasts at future effective boundaries.
@@ -186,7 +226,7 @@ export function validateHousehold(doc: HouseholdPlan): void {
     amount(operating + savings);
     for (const fund of ['operating', 'savings'] as const)
       amount(
-        doc.transfers
+        activeTransfers(doc)
           .filter((t) => t.month === month && t.fund === fund)
           .reduce((sum, t) => sum + t.amountMinor, 0),
       );
@@ -223,7 +263,7 @@ export function monthlyPlan(doc: HouseholdPlan, month: string) {
     memberTargets[0] - operatingShares[0],
     memberTargets[1] - operatingShares[1],
   ];
-  const transfers = doc.transfers.filter((t) => t.month === month);
+  const transfers = activeTransfers(doc).filter((t) => t.month === month);
   return {
     expenses,
     operatingMinor,
@@ -241,6 +281,41 @@ export function monthlyPlan(doc: HouseholdPlan, month: string) {
     transfers,
   };
 }
+function confirmationId(
+  month: string,
+  member: 0 | 1,
+  fund: Fund,
+  generation: number,
+): string {
+  const key = `${month}:${member}:${fund}`;
+  return generation === 0 ? key : `${key}:${generation}`;
+}
+export function activeTransfers(doc: HouseholdPlan): TransferConfirmation[] {
+  const retracted = new Set(
+    doc.transferRetractions.map((r) => r.confirmationId),
+  );
+  return doc.transfers.filter((t) => !retracted.has(t.id));
+}
+export function retractFundTransfer(
+  doc: HouseholdPlan,
+  id: string,
+  member: 0 | 1,
+  retractedAt: string,
+): HouseholdPlan {
+  const target = doc.transfers.find((t) => t.id === id);
+  if (!target || target.member !== member)
+    throw new Error('You can retract only your own funding confirmation.');
+  if (doc.transferRetractions.some((r) => r.confirmationId === id)) return doc;
+  const next = {
+    ...doc,
+    transferRetractions: [
+      ...doc.transferRetractions,
+      { id: `retract:${id}`, confirmationId: id, member, retractedAt },
+    ],
+  };
+  validateHousehold(next);
+  return next;
+}
 export function confirmFundTransfer(
   doc: HouseholdPlan,
   month: string,
@@ -251,7 +326,7 @@ export function confirmFundTransfer(
   if (member !== 0 && member !== 1)
     throw new Error('Choose a household member.');
   if (
-    doc.transfers.some(
+    activeTransfers(doc).some(
       (t) => t.month === month && t.member === member && t.fund === fund,
     )
   )
@@ -263,12 +338,22 @@ export function confirmFundTransfer(
     fund === 'operating' ? plan.operatingShares : plan.savingsShares
   )[member];
   if (!amountMinor) throw new Error('No transfer is required for this fund.');
+  const generation =
+    Math.max(
+      -1,
+      ...doc.transfers
+        .filter(
+          (t) => t.month === month && t.member === member && t.fund === fund,
+        )
+        .map((t) => t.generation),
+    ) + 1;
   const next = {
     ...doc,
     transfers: [
       ...doc.transfers,
       {
-        id: `${month}:${member}:${fund}`,
+        id: confirmationId(month, member, fund, generation),
+        generation,
         month,
         member,
         fund,
@@ -287,7 +372,9 @@ export function confirmTransfer(
   member: 0 | 1,
   confirmedAt: string,
 ): HouseholdPlan {
-  if (doc.transfers.some((t) => t.month === month && t.member === member))
+  if (
+    activeTransfers(doc).some((t) => t.month === month && t.member === member)
+  )
     throw new Error('This member has already confirmed a transfer this month.');
   const plan = monthlyPlan(doc, month);
   let next = doc;
@@ -345,7 +432,25 @@ export function canonicalHousehold(doc: HouseholdPlan): string {
     savingsTargets: [...doc.savingsTargets].sort((a, b) =>
       a.month.localeCompare(b.month),
     ),
-    transfers: [...doc.transfers].sort((a, b) => a.id.localeCompare(b.id)),
+    transfers: [...doc.transfers]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((t) => ({
+        id: t.id,
+        month: t.month,
+        member: t.member,
+        fund: t.fund,
+        amountMinor: t.amountMinor,
+        confirmedAt: t.confirmedAt,
+        generation: t.generation,
+      })),
+    transferRetractions: [...doc.transferRetractions]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((r) => ({
+        id: r.id,
+        confirmationId: r.confirmationId,
+        member: r.member,
+        retractedAt: r.retractedAt,
+      })),
     legacyDrafts: [...doc.legacyDrafts].sort((a, b) =>
       a.month.localeCompare(b.month),
     ),
@@ -390,10 +495,21 @@ export function upgradeHousehold(value: unknown): HouseholdPlan {
             fund,
             amountMinor,
             confirmedAt: old.confirmedAt,
+            generation: 0,
           });
       }
     }
     next = { ...raw, schemaVersion: 4, ledger: raw.ledger ?? [], transfers };
+  }
+  if (next.schemaVersion === 4) {
+    if (!Array.isArray(next.transfers))
+      throw new Error('Invalid transfer history.');
+    next = {
+      ...next,
+      schemaVersion: 5,
+      transfers: next.transfers.map((t) => ({ ...t, generation: 0 })),
+      transferRetractions: next.transferRetractions ?? [],
+    };
   }
   validateHousehold(next as unknown as HouseholdPlan);
   return next as unknown as HouseholdPlan;

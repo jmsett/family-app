@@ -8,7 +8,7 @@ import type {
   Shares,
   SplitMode,
 } from '@family/shared';
-import { MAX_MINOR, validDate } from './index';
+import { MAX_MINOR, validDate, activeTransfers } from './index';
 export const PARTIES: Party[] = ['a', 'b', 'household'];
 export function partyName(doc: HouseholdPlan, party: Party): string {
   return party === 'household'
@@ -367,7 +367,7 @@ export function recordedFunds(doc: HouseholdPlan, month: string) {
   const [year, index] = month.split('-').map(Number);
   const through = `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`;
   const totals = { operating: 0, savings: 0 };
-  for (const transfer of doc.transfers.filter((t) => t.month <= month))
+  for (const transfer of activeTransfers(doc).filter((t) => t.month <= month))
     totals[transfer.fund] += transfer.amountMinor;
   for (const event of activeEntries(doc.ledger, through)) {
     if (event.kind === 'expense' && effectivePayer(event) === 'household')

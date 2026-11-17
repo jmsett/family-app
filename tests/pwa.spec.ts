@@ -94,6 +94,23 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await expect(page.getByTestId('chart-value')).toHaveText('€180.00');
   await page.getByLabel('Chart series').selectOption('operating');
   await expect(page.getByTestId('chart-value')).toHaveText('€20.00');
+  await navigate(page, 'Overview');
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', {
+      name: 'Retract my savings confirmation',
+      exact: true,
+    })
+    .click();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€80.00');
+  await page.reload();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€80.00');
+  await expect(
+    page.getByRole('button', {
+      name: 'Confirm my savings transfer',
+      exact: true,
+    }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -312,11 +329,58 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await expect(second.getByTestId('savings-funds')).toHaveText('€230.00');
   await expect(second.getByTestId('operating-funds')).toHaveText('€20.00');
   await expect(second.getByTestId('balance-a')).toHaveText('€0.00');
+  // An offline retraction must survive another device uploading a stale confirmation.
+  await navigate(page, 'Overview');
+  await context.setOffline(true);
+  await secondContext.setOffline(true);
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', {
+      name: 'Retract my savings confirmation',
+      exact: true,
+    })
+    .click();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€105.00');
+  await second
+    .getByRole('button', { name: 'Add expense', exact: true })
+    .click();
+  await second.getByLabel('Expense description').fill('Stale device snack');
+  await second.getByLabel('Expense amount', { exact: true }).fill('2');
+  await second
+    .getByRole('button', { name: 'Save expense', exact: true })
+    .click();
+  await context.setOffline(false);
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await secondContext.setOffline(false);
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Overview');
+  await expect(second.getByTestId('savings-funds')).toHaveText('€105.00');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(page, 'Overview');
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Confirm my savings transfer', exact: true })
+    .click();
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Overview');
+  await expect(second.getByTestId('savings-funds')).toHaveText('€230.00');
   const uploaded = JSON.parse(
     Buffer.from(remote!.content, 'base64').toString('utf8'),
   );
-  expect(uploaded.ledger).toHaveLength(4);
-  expect(uploaded.schemaVersion).toBe(4);
+  expect(uploaded.ledger).toHaveLength(5);
+  expect(uploaded.transfers).toHaveLength(3);
+  expect(uploaded.transferRetractions).toHaveLength(1);
+  expect(uploaded.schemaVersion).toBe(5);
   await secondContext.close();
 });
 

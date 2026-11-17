@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import {
   canonicalHousehold,
   confirmFundTransfer,
+  retractFundTransfer,
   fundingStatus,
   EXPENSE_CATEGORIES,
   monthlyPlan,
@@ -490,7 +491,23 @@ function Overview({
     if (member !== '0' && member !== '1') return;
     const index = Number(member) as 0 | 1;
     const status = fundingStatus(document, month, index, fund);
-    if (status.complete) return;
+    if (status.confirmation) {
+      if (
+        window.confirm(
+          `Retract ${money(status.confirmation.amountMinor)} ${fund} confirmation for ${monthName(month)}?`,
+        )
+      )
+        await commit(
+          retractFundTransfer(
+            document,
+            status.confirmation.id,
+            index,
+            new Date().toISOString(),
+          ),
+        );
+      return;
+    }
+    if (status.notRequired) return;
     if (
       window.confirm(
         `Confirm ${money(status.target)} transferred to ${fund} for ${monthName(month)}?`,
@@ -556,7 +573,9 @@ function Overview({
                   const label = status.notRequired
                     ? `${name}: ${fund} not required`
                     : status.confirmation
-                      ? `${name}: ${fund} confirmed ${money(status.confirmation.amountMinor)}`
+                      ? mine
+                        ? `Retract my ${fund} confirmation`
+                        : `${name}: ${fund} confirmed ${money(status.confirmation.amountMinor)}`
                       : mine
                         ? `Confirm my ${fund} transfer`
                         : `${name}: ${fund} awaiting confirmation`;
@@ -565,13 +584,14 @@ function Overview({
                       type="button"
                       className={`fund-check ${status.complete ? 'complete' : ''}`}
                       key={i}
-                      title={`${name}: ${status.notRequired ? 'No transfer required' : status.confirmation ? 'Confirmed' : `${money(status.target)} pending`}`}
+                      title={`${name}: ${status.notRequired ? 'No transfer required' : status.confirmation ? (mine ? 'Confirmed · tap to retract' : 'Confirmed') : `${money(status.target)} pending`}`}
                       aria-label={label}
+                      aria-pressed={status.complete}
                       disabled={
                         disabled ||
                         ledgerDirty ||
                         movementOpen ||
-                        status.complete ||
+                        status.notRequired ||
                         !mine
                       }
                       onClick={() => void confirm(fund)}

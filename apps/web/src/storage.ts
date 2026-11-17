@@ -56,7 +56,7 @@ export async function readRecord(): Promise<LocalRecord> {
             tx.abort();
             return;
           }
-          if (oldVersion !== 4) {
+          if (oldVersion !== 5) {
             record.pending = true;
             store.put(record, 'current');
           }
@@ -140,6 +140,19 @@ export async function writeRecord(
         ) {
           failure =
             'Recorded transfer amounts cannot be removed or changed. Export both copies for review.';
+          tx.abort();
+          return;
+        }
+        if (
+          (current?.document.transferRetractions ?? []).some(
+            (r) =>
+              !next.document.transferRetractions.some(
+                (entry) => entry.id === r.id,
+              ),
+          )
+        ) {
+          failure =
+            'Funding retractions cannot be removed from history. Confirm the transfer again instead.';
           tx.abort();
           return;
         }

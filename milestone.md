@@ -1,6 +1,17 @@
 # Milestones and owner review gates
 
-## Funding comparisons, value-axis touch scaling and category pie — current review slice
+## Retractable funding confirmations — current review slice
+
+**Status: implemented; local verification passed, owner review pending.** Owner requested undoing a mistaken funding confirmation by tapping its checkmark again.
+
+- Own confirmed checkmarks open a concise retraction prompt; cancelling preserves the record, accepting restores pending status and removes that contribution from funds and chart totals. The other fund/member is unaffected. Confirm again later using the current share.
+- Fund activity preserves the original amount and marks it Retracted. Schema 5 adds immutable retractions and confirmation generations; migrations preserve old money/history and existing device credentials.
+- Canonical retractions survive stale-device uploads and plan recovery; old retractions cannot cancel newer confirmations. Duplicate retries merge, while conflicting amounts remain review conflicts.
+- Verification passed: type checking, lint, build, formatting, 83 domain/API/sync tests, 36 desktop/Android workflows and six production PWA cases, including offline retraction/reload and two-device stale confirmation/reconfirmation. Physical phone/private-repository checks remain owner review.
+
+Try: confirm both funds; tap the operating checkmark and cancel, then accept. Operating funding should return to pending while savings stays confirmed. Reload, confirm operating again, and expand Fund activity to see the retained Retracted original.
+
+## Funding comparisons, value-axis touch scaling and category pie — earlier review slice
 
 **Status: implemented; owner review pending.**
 
