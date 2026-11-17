@@ -1,5 +1,5 @@
 
-const VERSION = '4efc5234190c52c7';
+const VERSION = '322a03a63fef4091';
 const PREFIX = 'family-shell-' + encodeURIComponent(self.registration.scope) + '-';
 const CACHE = PREFIX + VERSION;
 const FILES = ["assets/index-CuJv5UHs.css","assets/index-D94Ph_68.js","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","index.html","manifest.webmanifest"].map(path => new URL(path, self.registration.scope).href);
@@ -19,9 +19,12 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || !url.href.startsWith(self.registration.scope)) return;
+  const assetUrl = new URL(url.href);
+  assetUrl.search = '';
+  assetUrl.hash = '';
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(() => caches.open(CACHE).then(cache => cache.match(new URL('index.html', self.registration.scope).href, { ignoreVary: true }))));
-  } else if (FILES.includes(url.href)) {
-    event.respondWith(caches.open(CACHE).then(async cache => (await cache.match(request, { ignoreVary: true })) || fetch(request)));
+  } else if (FILES.includes(assetUrl.href)) {
+    event.respondWith(caches.open(CACHE).then(async cache => (await cache.match(assetUrl.href, { ignoreVary: true })) || fetch(request)));
   }
 });

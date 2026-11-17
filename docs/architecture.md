@@ -1,5 +1,9 @@
 # Foundation decisions and API contract
 
+## ADR 012: Separate PWA installation identity
+
+Both Family and Nunz previously used manifest `id: "./"`. Unlike `start_url`/`scope`, a relative `id` resolves against the start URL's origin, so both advertised `https://jmsett.github.io/`. This can collide with an already installed application. Family now declares explicit `id`, `start_url` and `scope` values of `/family-app/`. Nunz is not modified. Keep this identifier stable across future icon and palette changes. The HTML links a versioned manifest URL so older workers bypass their previously cached manifest; the new worker normalizes query strings only for known built assets, keeping the versioned manifest available offline. Browser tests assert the resolved Family identity is `/family-app/`, not the shared origin root. No household, credential or appearance storage is cleared by this fix.
+
 ## ADR 011: JML / Afterglow visual preferences
 
 The owner supplied `Multicolor JML Monogram App Icon.png` and the `afterglow-neon-pwa` reference. Package the existing artwork into 192/512 PNG icons plus a padded 512 maskable variant, without changing the original file. Use the same asset in the app header and favicon. The default interface is dark with the logo palette and Electric halo fills; Light and Device modes are available.

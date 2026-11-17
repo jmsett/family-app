@@ -48,10 +48,13 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || !url.href.startsWith(self.registration.scope)) return;
+  const assetUrl = new URL(url.href);
+  assetUrl.search = '';
+  assetUrl.hash = '';
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).catch(() => caches.open(CACHE).then(cache => cache.match(new URL('index.html', self.registration.scope).href, { ignoreVary: true }))));
-  } else if (FILES.includes(url.href)) {
-    event.respondWith(caches.open(CACHE).then(async cache => (await cache.match(request, { ignoreVary: true })) || fetch(request)));
+  } else if (FILES.includes(assetUrl.href)) {
+    event.respondWith(caches.open(CACHE).then(async cache => (await cache.match(assetUrl.href, { ignoreVary: true })) || fetch(request)));
   }
 });
 `,

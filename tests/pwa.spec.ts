@@ -29,6 +29,12 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
     ).json(),
   );
   expect(manifest.display).toBe('standalone');
+  const identity = new URL(manifest.id, new URL(page.url()).origin + '/');
+  expect(identity.pathname).toBe('/family-app/');
+  expect(identity.pathname).not.toBe('/');
+  expect(manifest.start_url).toBe('/family-app/');
+  expect(manifest.scope).toBe('/family-app/');
+
   expect(manifest.icons).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ sizes: '192x192' }),
@@ -37,6 +43,18 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   );
   await context.setOffline(true);
   await page.reload();
+  const offlineId = await page.evaluate(
+    async () =>
+      (
+        await (
+          await fetch(
+            document.querySelector<HTMLLinkElement>('link[rel="manifest"]')!
+              .href,
+          )
+        ).json()
+      ).id,
+  );
+  expect(offlineId).toBe('/family-app/');
   await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
   await confirm(page, '1');
   await expect(page.getByTestId('savings-funds')).toHaveText('€200.00');

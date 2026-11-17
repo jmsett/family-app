@@ -72,6 +72,8 @@ bash scripts/npm.sh run test:pwa # static subpath, offline shell, mocked multi-d
 
 If the Pages URL displays this README, check that the latest commit includes root `index.html` and Pages is publishing **main / (root)**. Wait for GitHub's automatic **pages build and deployment** run to succeed. In **Settings**, expand **Sync & backups** to connect a device or export the household; its status remains visible when collapsed.
 
+Family has a dedicated PWA identity (`/family-app/`) and scope, separate from Nunz. If Android says it is already installed after removing an older Family installation, close Family and Chrome windows, reopen [the updated Family page](https://jmsett.github.io/family-app/?install=family), then try installing from Chrome. Do not clear `jmsett.github.io` site data as a troubleshooting step: it can remove unsynced Family/Nunz records and saved device connections.
+
 For future source updates, rebuild the public files before committing:
 
 ```bash

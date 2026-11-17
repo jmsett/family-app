@@ -3,10 +3,12 @@ export async function navigate(
   page: Page,
   name: 'Overview' | 'Monthly plan' | 'Settings',
 ) {
-  await page
+  await page.bringToFront();
+  const button = page
     .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('button', { name, exact: true })
-    .click();
+    .getByRole('button', { name, exact: true });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-current', 'page');
 }
 export async function setSavings(page: Page, value: string) {
   await navigate(page, 'Monthly plan');

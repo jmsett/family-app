@@ -2,6 +2,10 @@
 
 **2026-11-17 owner direction:** Implement the public Pages PWA / private GitHub JSON architecture now, using `nunz-app` as reference. This explicitly authorizes the architecture slice spanning the former M1/M7/M8 boundaries while M0 feedback stays pending. See [plan.md](plan.md); legacy VPN/passkey/server requirements below are superseded for production. Other financial milestones still require owner review.
 
+## Android installation identity fix
+
+Owner reported “already installed” after removing Family to refresh its icon. Found that Family and Nunz both advertised `id: "./"`, resolving to the same origin-root identity. Family now uses `/family-app/` explicitly for identity, launch and scope; Nunz remains untouched. Production browser checks assert identity and offline behavior. Do not clear shared-origin browser data or delete another app to work around this collision. Physical Android reinstall must be verified by the owner.
+
 ## JML branding and Afterglow appearance — current review
 
 Owner requested the supplied Multicolor JML logo, its palette and all effects from the Afterglow reference, particularly Electric halo. Header/favicon/PWA icons now use that artwork. Appearance settings include Dark/Light/Device themes, four Afterglow effects plus Solid, palette presets and custom accent/gradient/chart colors, glow, speed, motion and preview controls. Preferences persist per device; reset does not affect household records or sync credentials. Confirmed-fund bars use the chosen style, with no fill for unconfirmed funds. Goal tracking/actual analytics remain future work; previews are explicitly samples. Desktop and Pixel 7 browser checks cover persistence, real bar colors and reduced motion.

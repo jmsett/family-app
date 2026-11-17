@@ -1,10 +1,10 @@
 {
-  "id": "./",
+  "id": "/family-app/",
   "name": "Family Manager",
   "short_name": "Family",
   "description": "Plan together, save offline and synchronize your private household budget.",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/family-app/",
+  "scope": "/family-app/",
   "display": "standalone",
   "background_color": "#080914",
   "theme_color": "#080914",
