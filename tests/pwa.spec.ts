@@ -149,6 +149,7 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await page
     .getByRole('button', { name: 'Save allocation', exact: true })
     .click();
+  await expect(offlineTrip).toContainText('€50.00 / €1,713.50');
   await page.reload();
   await navigate(page, 'Travel');
   await expect(offlineTrip).toContainText('€50.00 / €1,713.50');

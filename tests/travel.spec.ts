@@ -87,6 +87,12 @@ test('joint trip goals budget dates, earmark savings once, retain photos and lab
   await expect(page.getByLabel('History label', { exact: true })).toHaveValue(
     label,
   );
+  await navigate(page, 'Overview');
+  await expect(page.getByLabel('History label', { exact: true })).toHaveValue(
+    'all',
+  );
+  await page.locator('.ledger-history > details > summary').click();
+  await page.getByLabel('History label', { exact: true }).selectOption(label);
   await page
     .getByRole('button', { name: 'Reset filters', exact: true })
     .click();

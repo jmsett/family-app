@@ -797,8 +797,12 @@ export function LedgerPanel({
       setFilterLabel(tripFilter.label);
       setFromDate('2000-01-01');
       setToDate('2100-12-31');
+    } else {
+      setFilterLabel('all');
+      setFromDate(`${month}-01`);
+      setToDate(`${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`);
     }
-  }, [tripFilter]);
+  }, [tripFilter, month, year, index]);
   const labelOptions = [
     ...new Set([
       ...document.trips.map((t) => t.label),
