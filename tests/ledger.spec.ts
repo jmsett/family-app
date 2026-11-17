@@ -85,9 +85,11 @@ test('expenses, partial repayments and corrections retain history and carry debt
   await page.getByLabel('Planning month').fill('2027-01');
   await expect(page.getByTestId('balance-a')).toHaveText('+€35.00');
   await page.reload();
-  await expect(page.getByTestId('personal-balance')).toHaveText(
-    'Your balance +€35.00',
-  );
+  await expect(page.getByTestId('personal-balance')).toHaveCount(0);
+  await expect(page.getByTestId('balance-a')).toHaveText('+€35.00');
+  await expect(
+    page.locator('.balance-row').filter({ has: page.getByTestId('balance-a') }),
+  ).toContainText('you');
   await navigate(page, 'Settings');
   await expect(page.getByLabel('Your identity')).toHaveValue('0');
 });

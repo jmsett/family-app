@@ -84,6 +84,16 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await page.reload();
   await expect(page.getByTestId('savings-funds')).toHaveText('€180.00');
   await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
+  // Visit the lazy chart view for the first time while offline.
+  await navigate(page, 'Charts');
+  await expect(
+    page.getByTestId('history-chart').locator('canvas').first(),
+  ).toBeVisible();
+  await expect(page.getByTestId('chart-value')).toHaveText('€20.00');
+  await page.getByLabel('Chart series').selectOption('savings');
+  await expect(page.getByTestId('chart-value')).toHaveText('€180.00');
+  await page.getByLabel('Chart series').selectOption('operating');
+  await expect(page.getByTestId('chart-value')).toHaveText('€20.00');
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

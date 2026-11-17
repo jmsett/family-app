@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   canonicalHousehold,
@@ -21,6 +21,8 @@ import { useAppearance } from './appearance';
 import { AppearancePanel } from './AppearancePanel';
 import { AppearanceContext } from './ProgressBar';
 import './style.css';
+const HistoryPanel = lazy(() => import('./HistoryPanel'));
+import { NavIcon } from './NavIcon';
 
 const money = (value: number) =>
   new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(
@@ -40,7 +42,7 @@ const monthName = (month: string) =>
     timeZone: 'UTC',
   }).format(new Date(`${month}-01T12:00:00Z`));
 type Commit = (doc: HouseholdPlan) => Promise<boolean>;
-type Page = 'overview' | 'plan' | 'settings';
+type Page = 'overview' | 'plan' | 'charts' | 'settings';
 
 function MonthlyPlan({
   document,
@@ -477,7 +479,7 @@ function Overview({
     if (status.complete) return;
     if (
       window.confirm(
-        `I am ${document.memberNames[index]} and confirm I transferred ${money(status.target)} for ${fund} in ${monthName(month)}. This is my declaration, not bank verification.`,
+        `Confirm ${money(status.target)} transferred to ${fund} for ${monthName(month)}?`,
       )
     )
       await commit(
@@ -498,58 +500,84 @@ function Overview({
             <span className="card-label">
               {fund === 'operating' ? 'Operating funds' : 'Savings funds'}
             </span>
-            <strong data-testid={`${fund}-funds`}>
+            <strong className="fund-value" data-testid={`${fund}-funds`}>
               {money(
                 fund === 'operating'
                   ? funds.unencumberedMinor
                   : funds.savingsMinor,
               )}
             </strong>
-            <div
-              className="fund-confirmations"
-              aria-label={`${fund} confirmations for ${monthName(month)}`}
-            >
-              {document.memberNames.map((name, i) => {
-                const status = fundingStatus(document, month, i as 0 | 1, fund);
-                const mine = member === String(i);
-                const label = status.notRequired
-                  ? `${name}: ${fund} not required`
-                  : status.confirmation
-                    ? `${name}: ${fund} confirmed ${money(status.confirmation.amountMinor)}`
-                    : mine
-                      ? `Confirm my ${fund} transfer`
-                      : `${name}: ${fund} awaiting confirmation`;
-                return (
-                  <button
-                    type="button"
-                    className={`fund-check ${status.complete ? 'complete' : ''}`}
-                    key={i}
-                    title={`${name}: ${status.notRequired ? 'No transfer required' : status.confirmation ? 'Confirmed' : `${money(status.target)} pending`}`}
-                    aria-label={label}
-                    disabled={
-                      disabled ||
-                      ledgerDirty ||
-                      movementOpen ||
-                      status.complete ||
-                      !mine
-                    }
-                    onClick={() => void confirm(fund)}
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      aria-hidden="true"
+            <div className="fund-month">
+              <small className="fund-due" data-testid={`${fund}-due`}>
+                Due{' '}
+                {month === today.slice(0, 7) ? 'this month' : monthName(month)}:{' '}
+                {money(
+                  fund === 'operating'
+                    ? plan.operatingMinor
+                    : plan.savingsMinor,
+                )}
+                {member !== '' && (
+                  <span>
+                    You:{' '}
+                    {money(
+                      (fund === 'operating'
+                        ? plan.operatingShares
+                        : plan.savingsShares)[Number(member)],
+                    )}
+                  </span>
+                )}
+              </small>
+              <div
+                className="fund-confirmations"
+                aria-label={`${fund} confirmations for ${monthName(month)}`}
+              >
+                {document.memberNames.map((name, i) => {
+                  const status = fundingStatus(
+                    document,
+                    month,
+                    i as 0 | 1,
+                    fund,
+                  );
+                  const mine = member === String(i);
+                  const label = status.notRequired
+                    ? `${name}: ${fund} not required`
+                    : status.confirmation
+                      ? `${name}: ${fund} confirmed ${money(status.confirmation.amountMinor)}`
+                      : mine
+                        ? `Confirm my ${fund} transfer`
+                        : `${name}: ${fund} awaiting confirmation`;
+                  return (
+                    <button
+                      type="button"
+                      className={`fund-check ${status.complete ? 'complete' : ''}`}
+                      key={i}
+                      title={`${name}: ${status.notRequired ? 'No transfer required' : status.confirmation ? 'Confirmed' : `${money(status.target)} pending`}`}
+                      aria-label={label}
+                      disabled={
+                        disabled ||
+                        ledgerDirty ||
+                        movementOpen ||
+                        status.complete ||
+                        !mine
+                      }
+                      onClick={() => void confirm(fund)}
                     >
-                      <path d="m5 12 4 4L19 6" />
-                    </svg>
-                    <span>{name}</span>
-                  </button>
-                );
-              })}
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        aria-hidden="true"
+                      >
+                        <path d="m5 12 4 4L19 6" />
+                      </svg>
+                      <span>{name}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </article>
         ))}
@@ -811,15 +839,29 @@ function App() {
             </a>
             <div className="header-actions">
               <nav aria-label="Main navigation">
-                {(['overview', 'plan'] as const).map((page) => (
+                {(['overview', 'plan', 'charts'] as const).map((page) => (
                   <button
                     key={page}
-                    className={view === page ? 'selected' : ''}
+                    className={`nav-icon ${view === page ? 'selected' : ''}`}
+                    aria-label={
+                      page === 'overview'
+                        ? 'Overview'
+                        : page === 'plan'
+                          ? 'Monthly plan'
+                          : 'Charts'
+                    }
+                    title={
+                      page === 'overview'
+                        ? 'Overview'
+                        : page === 'plan'
+                          ? 'Monthly plan'
+                          : 'Charts'
+                    }
                     aria-current={view === page ? 'page' : undefined}
                     disabled={busy || syncBusy}
                     onClick={() => changeView(page)}
                   >
-                    {page === 'overview' ? 'Overview' : 'Monthly plan'}
+                    <NavIcon name={page} />
                   </button>
                 ))}
               </nav>
@@ -854,9 +896,11 @@ function App() {
                 ? 'Overview'
                 : view === 'plan'
                   ? 'Monthly plan'
-                  : 'Settings'}
+                  : view === 'charts'
+                    ? 'Charts'
+                    : 'Settings'}
             </h1>
-            {view !== 'settings' && (
+            {(view === 'overview' || view === 'plan') && (
               <label className="month-picker">
                 <span>Month</span>
                 <input
@@ -935,6 +979,15 @@ function App() {
                   commit={commit}
                   onDirty={setDirty}
                 />
+              )}
+              {view === 'charts' && (
+                <Suspense
+                  fallback={
+                    <section className="panel">Opening charts…</section>
+                  }
+                >
+                  <HistoryPanel document={document} today={today} />
+                </Suspense>
               )}
               {view === 'settings' && (
                 <Settings

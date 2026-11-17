@@ -2,7 +2,7 @@
 
 ## Current product rules — 2026-11-17 owner feedback
 
-- Overview contains recorded operating/savings funds, Balances & settlements, with collapsed Fund activity. All plan definition belongs to Monthly plan; identity, connection and member setup belong to the top-right Settings cog.
+- Overview contains recorded operating/savings funds, a single balance row per party (current member marked “you”), separate history/category panels, and collapsed Fund activity. All plan definition belongs to Monthly plan; identity, connection and member setup belong to the top-right Settings cog.
 - Operating targets equal the sum of monthly recurring payments due in that month. Each schedule has a custom name, amount in cents, first due date, category and labels. Repeat monthly until archived or through an inclusive end date. Clamp month-end due dates; retain archived schedules and historical months.
 - Savings are a fixed monthly amount with effective-month history, carrying forward until changed. The contribution split is always 50/50; allocate rounding cents deterministically while balancing both envelopes and the combined target.
 - Only a member's explicit declaration adds that member's full operating/savings share to the month's confirmed funds. One immutable confirmation per member/month/fund; no bank verification or separate member authentication is claimed. Later CSV/bank/PayPal matching may verify declarations. Corrections to monthly contribution confirmations and partial contributions/top-ups remain future work; expense corrections use immutable reversals.
@@ -12,7 +12,7 @@
 
 Use the owner-supplied Multicolor JML logo for the header/favicon/PWA icons. Preserve the compact desktop/Android layouts while adopting its violet/pink/amber/cyan palette. Reference `afterglow-neon-pwa` for Electric halo (default), Liquid prism, Solar flare and Pixel rush, with a Solid fallback. Settings exposes theme, effect, palette, accent, operating/savings color stops, six category chart colors, glow, speed and motion controls with preview-only sample data.
 
-Appearance is personal to each device (`family-appearance-v1` in localStorage), with input validation, automatic persistence and a reset. It never changes household financial data or credentials. Real fund progress remains derived from confirmed transfers; no glow/fill is shown for unconfirmed zero funds. Reuse the bar component for future goals and charts. Respect system reduced motion and keep numeric labels independent of color.
+Appearance is personal to each device (`family-appearance-v1` in localStorage), with input validation, automatic persistence and a reset. It never changes household financial data or credentials. Fund confirmations remain separate from the appearance previews; current category bars and historical plots share the device palette. Reuse the bar component for future goals and charts. Respect system reduced motion and keep numeric labels independent of color.
 
 ## Current storage and synchronization — schema v4
 
@@ -28,9 +28,19 @@ Independent confirmations merge by stable `month:member:fund` ID; identical amou
 - Fold the old redundant member transfer section into Fund activity. Add immutable movements between operating/savings or out of tracked funds; they change balances without spending/debt. Purchases and household repayments can choose a fund under Advanced options. Savings availability subtracts recorded spending, outgoing transfers and withdrawals, adding incoming funds. Negative balances reflect records instead of silently deleting transactions.
 - Migrate v2/v3 funding records to schema4 IDs `month:member:fund`; preserve ledger events, revision/baseline, credentials and appearance. Independent fund confirmations and UUID movements union safely offline; same-ID monetary conflicts remain blocked.
 
-## Next pass — historical chart explorer
+## Authorized historical chart explorer and overview refinement
 
-The owner explicitly chose this as the next step **after** the compact UI/funding release. Implement a shared mobile chart interface with touch pan/zoom, date-range navigation, daily/weekly/monthly/yearly intervals and advanced controls collapsed. Select series for spending by category (period totals), cumulative savings (period-end balance), operating available funds (period-end balance) and operating budget (plan targets). Keep targets, spending and balances distinct. No candlesticks/OHLC data are needed. This explorer is not part of the current implementation pass.
+The owner explicitly requested implementing this pass now. Top navigation is Home → Calendar/Monthly plan → Charts → Settings, using labeled icon buttons. Fund numbers are centered in their value area, with small monthly total/own-share captions above checkmarks and concise confirmations. Remove the duplicate “Your balance” summary. History and current category spending each occupy their own section panel.
+
+Charts use bundled TradingView Lightweight Charts with only line/histogram rendering, touch horizontal pan/pinch zoom, hover/hold inspection, keyboard navigation, D/W/M/Y intervals, zoom buttons and All fit. Advanced options contains dates, expense category, grid and exact values. No candles, trading tools, market data requests or invented sample transactions. Preserve the owner's appearance palette and light/dark support; publish required library notices/licenses and precache the lazy chart chunk for first-use offline access.
+
+- Actual expenses sum per interval/category. Exclude settlements, fund movements and reversed expenses.
+- Savings and operating availability carry all earlier fund changes into the range and sample cumulative values at interval end. Include withdrawals, account-specific purchases/repayments, movements and operating liability reserves. Reconcile to Overview at month end.
+- Operating budget samples the **monthly** target at interval end, including forecasts; yearly aggregation does not add balances or imply annual spending. Weeks start Monday; range boundaries can produce partial periods.
+- Use confirmation dates inside their planning month, clamping early/late dates to that month’s boundary, in Europe/Busingen. This explicit date convention preserves the current monthly contribution contract. Reversals restate original periods.
+- Keep schema 4, financial history, tokens and device identity unchanged. This pass only derives chart data and changes presentation.
+
+Verification: financial aggregation/rounding/carryover/reversal/time-boundary tests, desktop/Android UI, native phone pinch/wheel/keyboard navigation, narrow/light layouts and offline first-visit chart loading. Actual physical-phone feedback remains owner review.
 
 ## Authorized expense and settlement pass
 

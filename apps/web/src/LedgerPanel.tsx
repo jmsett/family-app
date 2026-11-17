@@ -838,360 +838,380 @@ export function LedgerPanel({
     return `Reversal: ${target?.kind === 'expense' ? target.description : target?.kind === 'fund-movement' ? target.note : 'repayment'}`;
   };
   return (
-    <section
-      ref={panel}
-      className="panel ledger-panel"
-      aria-label="Balances and settlements"
-    >
-      <div className="section-heading">
-        <h2>Balances &amp; settlements</h2>
-        <span className="subtle-label">All dates</span>
-      </div>
-      {member && (
-        <p className="personal-balance" data-testid="personal-balance">
-          Your balance{' '}
-          <SignedMoney value={balances[member]} label="Your net balance" />
-        </p>
-      )}
-      <div className="balance-rows">
-        {PARTIES.map((p) => (
-          <div className="balance-row" key={p}>
-            <span>{partyName(document, p)}</span>
-            <SignedMoney
-              testId={`balance-${p}`}
-              value={balances[p]}
-              label={`${partyName(document, p)} net balance`}
-            />
-          </div>
-        ))}
-      </div>
-      <details
-        className="settle-up-section"
-        open={settleOpen}
-        onToggle={(e) => setSettleOpen(e.currentTarget.open)}
+    <>
+      <section
+        ref={panel}
+        className="panel ledger-panel"
+        aria-label="Balances and settlements"
       >
-        <summary>Settle up</summary>
-        {suggestions.length > 0 ? (
-          <div className="suggested-payments">
-            <h3>Suggested payments</h3>
-            <p className="muted">
-              Fewest payments for these three parties. Suggestions do not move
-              money.
-            </p>
-            {suggestions.map((s) => (
-              <div className="suggestion-row" key={`${s.from}:${s.to}`}>
-                <span>
-                  {partyName(document, s.from)} → {partyName(document, s.to)}
-                </span>
-                <div>
-                  <strong>{money(s.amountMinor)}</strong>
-                  <button
-                    className="secondary"
-                    disabled={disabled || editor !== null}
-                    onClick={() => edit({ type: 'settlement', suggestion: s })}
-                    aria-label={`Record payment from ${partyName(document, s.from)} to ${partyName(document, s.to)}`}
-                  >
-                    Record
-                  </button>
+        <div className="section-heading">
+          <h2>Balances &amp; settlements</h2>
+          <span className="subtle-label">All dates</span>
+        </div>
+        <div className="balance-rows">
+          {PARTIES.map((p) => (
+            <div className="balance-row" key={p}>
+              <span>
+                {partyName(document, p)}
+                {p === member && (
+                  <>
+                    {' '}
+                    <small className="member-you">you</small>
+                  </>
+                )}
+              </span>
+              <SignedMoney
+                testId={`balance-${p}`}
+                value={balances[p]}
+                label={`${partyName(document, p)} net balance`}
+              />
+            </div>
+          ))}
+        </div>
+        <details
+          className="settle-up-section"
+          open={settleOpen}
+          onToggle={(e) => setSettleOpen(e.currentTarget.open)}
+        >
+          <summary>Settle up</summary>
+          {suggestions.length > 0 ? (
+            <div className="suggested-payments">
+              <h3>Suggested payments</h3>
+              <p className="muted">
+                Fewest payments for these three parties. Suggestions do not move
+                money.
+              </p>
+              {suggestions.map((s) => (
+                <div className="suggestion-row" key={`${s.from}:${s.to}`}>
+                  <span>
+                    {partyName(document, s.from)} → {partyName(document, s.to)}
+                  </span>
+                  <div>
+                    <strong>{money(s.amountMinor)}</strong>
+                    <button
+                      className="secondary"
+                      disabled={disabled || editor !== null}
+                      onClick={() =>
+                        edit({ type: 'settlement', suggestion: s })
+                      }
+                      aria-label={`Record payment from ${partyName(document, s.from)} to ${partyName(document, s.to)}`}
+                    >
+                      Record
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="settled-message">All balances are settled.</p>
-        )}
-        <button
-          className="secondary"
-          disabled={disabled || editor !== null || !suggestions.length}
-          onClick={() => edit({ type: 'settlement' })}
-        >
-          Record a payment
-        </button>
-        {common && editor?.type === 'settlement' && (
-          <SettlementEditor {...common} suggestion={editor.suggestion} />
-        )}
-      </details>
-      <div className="entry-actions">
-        <button
-          className="primary"
-          disabled={disabled || editor !== null}
-          onClick={() => edit({ type: 'expense' })}
-        >
-          Add expense
-        </button>
-      </div>
-      {!member && (
-        <p className="muted">
-          <button className="inline-link" onClick={openSettings}>
-            Choose your name in Settings
-          </button>{' '}
-          to record expenses and payments.
-        </p>
-      )}
-      {common && editor?.type === 'expense' && (
-        <ExpenseEditor
-          key={editor.original?.id ?? 'new'}
-          {...common}
-          original={editor.original}
-        />
-      )}
-      {common && editor?.type === 'reverse' && (
-        <ReversalEditor {...common} target={editor.target} />
-      )}
-      <details className="activity-details">
-        <summary>
-          Expenses &amp; payment history ({document.ledger.length})
-        </summary>
-        <details className="history-filter-options">
-          <summary>
-            Filters
-            {filterParty !== 'all' ||
-            filterCategory !== 'all' ||
-            fromDate !== `${month}-01` ||
-            toDate !==
-              `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`
-              ? ' · active'
-              : ''}
-          </summary>
-          <div className="history-filters">
-            <div className="input-row">
-              <label>
-                From date
-                <input
-                  aria-label="History from date"
-                  type="date"
-                  min="2000-01-01"
-                  max="2100-12-31"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                />
-              </label>
-              <label>
-                To date
-                <input
-                  aria-label="History to date"
-                  type="date"
-                  min="2000-01-01"
-                  max="2100-12-31"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                />
-              </label>
+              ))}
             </div>
-            <div className="input-row">
-              <label>
-                Person / household
-                <select
-                  aria-label="History party"
-                  value={filterParty}
-                  onChange={(e) => setFilterParty(e.target.value)}
-                >
-                  <option value="all">Everyone</option>
-                  {PARTIES.map((p) => (
-                    <option key={p} value={p}>
-                      {partyName(document, p)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Category
-                <select
-                  aria-label="History category"
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
-                >
-                  <option value="all">All categories</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <p className="muted">
-              Filters affect history and spending charts, not outstanding
-              balances.
-            </p>
-          </div>
+          ) : (
+            <p className="settled-message">All balances are settled.</p>
+          )}
           <button
-            className="text-button"
-            onClick={() => {
-              setFromDate(`${month}-01`);
-              setToDate(
-                `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`,
-              );
-              setFilterParty('all');
-              setFilterCategory('all');
-            }}
+            className="secondary"
+            disabled={disabled || editor !== null || !suggestions.length}
+            onClick={() => edit({ type: 'settlement' })}
           >
-            Reset filters
+            Record a payment
           </button>
+          {common && editor?.type === 'settlement' && (
+            <SettlementEditor {...common} suggestion={editor.suggestion} />
+          )}
         </details>
-        {fromDate > toDate && (
-          <p className="validation" role="alert">
-            From date must not follow To date.
+        <div className="entry-actions">
+          <button
+            className="primary"
+            disabled={disabled || editor !== null}
+            onClick={() => edit({ type: 'expense' })}
+          >
+            Add expense
+          </button>
+        </div>
+        {!member && (
+          <p className="muted">
+            <button className="inline-link" onClick={openSettings}>
+              Choose your name in Settings
+            </button>{' '}
+            to record expenses and payments.
           </p>
         )}
-        {history.length ? (
-          history.map((event) => (
-            <article
-              className={`activity-row ${reversed.has(event.id) ? 'reversed-entry' : ''}`}
-              key={event.id}
-              aria-label={`${event.kind}: ${label(event)}`}
-            >
-              <div className="activity-summary">
-                <strong className="activity-title">{label(event)}</strong>
-                {member ? (
-                  <SignedMoney
-                    value={memberImpact(event, member, document.ledger)}
-                    label="Effect on your net balance"
+        {common && editor?.type === 'expense' && (
+          <ExpenseEditor
+            key={editor.original?.id ?? 'new'}
+            {...common}
+            original={editor.original}
+          />
+        )}
+        {common && editor?.type === 'reverse' && (
+          <ReversalEditor {...common} target={editor.target} />
+        )}
+      </section>
+      <section
+        className="panel ledger-history"
+        aria-label="Expenses and payment history"
+      >
+        <details className="standalone-details">
+          <summary>
+            Expenses &amp; payment history ({document.ledger.length})
+          </summary>
+          <details className="history-filter-options">
+            <summary>
+              Filters
+              {filterParty !== 'all' ||
+              filterCategory !== 'all' ||
+              fromDate !== `${month}-01` ||
+              toDate !==
+                `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`
+                ? ' · active'
+                : ''}
+            </summary>
+            <div className="history-filters">
+              <div className="input-row">
+                <label>
+                  From date
+                  <input
+                    aria-label="History from date"
+                    type="date"
+                    min="2000-01-01"
+                    max="2100-12-31"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
                   />
-                ) : (
-                  <span className="muted">Choose identity</span>
-                )}
+                </label>
+                <label>
+                  To date
+                  <input
+                    aria-label="History to date"
+                    type="date"
+                    min="2000-01-01"
+                    max="2100-12-31"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                  />
+                </label>
               </div>
-              {event.kind === 'expense' && (
-                <small className="activity-caption">
-                  {partyName(document, event.payer)} paid{' '}
-                  {money(event.amountMinor)}
-                </small>
-              )}
-              {event.kind === 'settlement' && (
-                <small className="activity-caption">
-                  {partyName(document, event.from)} paid{' '}
-                  {money(event.amountMinor)}
-                </small>
-              )}
-              {event.kind === 'fund-movement' && (
-                <small className="activity-caption">
-                  Moved {money(event.amountMinor)}
-                </small>
-              )}
-              <details className="entry-details">
-                <summary>Details</summary>
-                <div className="entry-detail-content">
-                  <p>
-                    {event.date}
-                    {reversed.has(event.id) ? ' · Reversed' : ''}
-                  </p>
-                  <p>
-                    Recorded by {partyName(document, event.actor)} ·{' '}
-                    {new Date(event.createdAt).toLocaleString()}
-                  </p>
-                  {event.kind === 'expense' && (
-                    <>
-                      <p>
-                        Paid from{' '}
-                        {event.source === 'household'
-                          ? `${event.fund ?? 'operating'} funds`
-                          : 'personal funds'}
-                      </p>
-                      <p>
-                        {event.category}
-                        {event.labels.length
-                          ? ` · ${event.labels.join(' · ')}`
-                          : ''}
-                      </p>
-                      <p>
-                        {event.splitMode === 'equal'
-                          ? 'Equal split'
-                          : event.splitMode === 'percentage'
-                            ? 'Percentage split'
-                            : 'Exact amounts'}{' '}
-                        ·{' '}
-                        {PARTIES.filter((_, i) => event.shares[i] > 0)
-                          .map(
-                            (p) =>
-                              `${partyName(document, p)} ${money(event.shares[PARTIES.indexOf(p)])}`,
-                          )
-                          .join(' · ')}
-                      </p>
-                    </>
+              <div className="input-row">
+                <label>
+                  Person / household
+                  <select
+                    aria-label="History party"
+                    value={filterParty}
+                    onChange={(e) => setFilterParty(e.target.value)}
+                  >
+                    <option value="all">Everyone</option>
+                    {PARTIES.map((p) => (
+                      <option key={p} value={p}>
+                        {partyName(document, p)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Category
+                  <select
+                    aria-label="History category"
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                  >
+                    <option value="all">All categories</option>
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="muted">
+                Filters affect history and spending charts, not outstanding
+                balances.
+              </p>
+            </div>
+            <button
+              className="text-button"
+              onClick={() => {
+                setFromDate(`${month}-01`);
+                setToDate(
+                  `${month}-${new Date(Date.UTC(year, index, 0)).getUTCDate()}`,
+                );
+                setFilterParty('all');
+                setFilterCategory('all');
+              }}
+            >
+              Reset filters
+            </button>
+          </details>
+          {fromDate > toDate && (
+            <p className="validation" role="alert">
+              From date must not follow To date.
+            </p>
+          )}
+          {history.length ? (
+            history.map((event) => (
+              <article
+                className={`activity-row ${reversed.has(event.id) ? 'reversed-entry' : ''}`}
+                key={event.id}
+                aria-label={`${event.kind}: ${label(event)}`}
+              >
+                <div className="activity-summary">
+                  <strong className="activity-title">{label(event)}</strong>
+                  {member ? (
+                    <SignedMoney
+                      value={memberImpact(event, member, document.ledger)}
+                      label="Effect on your net balance"
+                    />
+                  ) : (
+                    <span className="muted">Choose identity</span>
                   )}
-                  {event.kind === 'settlement' && (
-                    <>
-                      {event.note && <p>{event.note}</p>}
-                      {(event.from === 'household' ||
-                        event.to === 'household') && (
-                        <p>Household account: {event.fund ?? 'operating'}</p>
-                      )}
-                      <p>
-                        The signed amount shows debt reduction, not income or
-                        spending.
-                      </p>
-                    </>
-                  )}
-                  {event.kind === 'fund-movement' && (
+                </div>
+                {event.kind === 'expense' && (
+                  <small className="activity-caption">
+                    {partyName(document, event.payer)} paid{' '}
+                    {money(event.amountMinor)}
+                  </small>
+                )}
+                {event.kind === 'settlement' && (
+                  <small className="activity-caption">
+                    {partyName(document, event.from)} paid{' '}
+                    {money(event.amountMinor)}
+                  </small>
+                )}
+                {event.kind === 'fund-movement' && (
+                  <small className="activity-caption">
+                    Moved {money(event.amountMinor)}
+                  </small>
+                )}
+                <details className="entry-details">
+                  <summary>Details</summary>
+                  <div className="entry-detail-content">
                     <p>
-                      {event.from} →{' '}
-                      {event.to === 'external'
-                        ? 'outside tracked funds'
-                        : event.to}
-                      {' · '}no effect on personal debt
+                      {event.date}
+                      {reversed.has(event.id) ? ' · Reversed' : ''}
                     </p>
-                  )}
-                  {event.kind === 'reversal' && <p>{event.reason}</p>}
-                  {!reversed.has(event.id) && event.kind !== 'reversal' && (
-                    <div className="entry-actions">
-                      {event.kind === 'expense' && (
+                    <p>
+                      Recorded by {partyName(document, event.actor)} ·{' '}
+                      {new Date(event.createdAt).toLocaleString()}
+                    </p>
+                    {event.kind === 'expense' && (
+                      <>
+                        <p>
+                          Paid from{' '}
+                          {event.source === 'household'
+                            ? `${event.fund ?? 'operating'} funds`
+                            : 'personal funds'}
+                        </p>
+                        <p>
+                          {event.category}
+                          {event.labels.length
+                            ? ` · ${event.labels.join(' · ')}`
+                            : ''}
+                        </p>
+                        <p>
+                          {event.splitMode === 'equal'
+                            ? 'Equal split'
+                            : event.splitMode === 'percentage'
+                              ? 'Percentage split'
+                              : 'Exact amounts'}{' '}
+                          ·{' '}
+                          {PARTIES.filter((_, i) => event.shares[i] > 0)
+                            .map(
+                              (p) =>
+                                `${partyName(document, p)} ${money(event.shares[PARTIES.indexOf(p)])}`,
+                            )
+                            .join(' · ')}
+                        </p>
+                      </>
+                    )}
+                    {event.kind === 'settlement' && (
+                      <>
+                        {event.note && <p>{event.note}</p>}
+                        {(event.from === 'household' ||
+                          event.to === 'household') && (
+                          <p>Household account: {event.fund ?? 'operating'}</p>
+                        )}
+                        <p>
+                          The signed amount shows debt reduction, not income or
+                          spending.
+                        </p>
+                      </>
+                    )}
+                    {event.kind === 'fund-movement' && (
+                      <p>
+                        {event.from} →{' '}
+                        {event.to === 'external'
+                          ? 'outside tracked funds'
+                          : event.to}
+                        {' · '}no effect on personal debt
+                      </p>
+                    )}
+                    {event.kind === 'reversal' && <p>{event.reason}</p>}
+                    {!reversed.has(event.id) && event.kind !== 'reversal' && (
+                      <div className="entry-actions">
+                        {event.kind === 'expense' && (
+                          <button
+                            className="text-button"
+                            disabled={disabled || editor !== null}
+                            onClick={() =>
+                              edit({ type: 'expense', original: event })
+                            }
+                          >
+                            Correct
+                          </button>
+                        )}
                         <button
                           className="text-button"
                           disabled={disabled || editor !== null}
                           onClick={() =>
-                            edit({ type: 'expense', original: event })
+                            edit({ type: 'reverse', target: event })
                           }
                         >
-                          Correct
+                          Reverse
                         </button>
-                      )}
-                      <button
-                        className="text-button"
-                        disabled={disabled || editor !== null}
-                        onClick={() => edit({ type: 'reverse', target: event })}
-                      >
-                        Reverse
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </details>
-            </article>
-          ))
-        ) : (
-          <p className="empty-copy">No entries in this range.</p>
-        )}
-      </details>
-      <details className="activity-details">
-        <summary>Spending by category</summary>
-        <span className="sr-only" data-testid="actual-spending-total">
-          {money(total)}
-        </span>
-        {spending.map((row) => {
-          const known = EXPENSE_CATEGORIES.indexOf(row.category);
-          const colorIndex =
-            known < 0
-              ? [...row.category].reduce((sum, c) => sum + c.charCodeAt(0), 0) %
-                6
-              : known;
-          return (
-            <div className="spending-row" key={row.category}>
-              <span>{row.category}</span>
-              <strong>{money(row.amountMinor)}</strong>
-              <ProgressBar
-                label={`${row.category} actual spending`}
-                value={total ? (row.amountMinor / total) * 100 : 0}
-                chartIndex={colorIndex}
-                valueText={money(row.amountMinor)}
-              />
-            </div>
-          );
-        })}
-        {!spending.length && (
-          <p className="empty-copy">No recorded purchases in this range.</p>
-        )}
-      </details>
-    </section>
+                      </div>
+                    )}
+                  </div>
+                </details>
+              </article>
+            ))
+          ) : (
+            <p className="empty-copy">No entries in this range.</p>
+          )}
+        </details>
+      </section>
+      <section
+        className="panel category-panel"
+        aria-label="Spending by category"
+      >
+        <details className="standalone-details">
+          <summary>Spending by category</summary>
+          <span className="sr-only" data-testid="actual-spending-total">
+            {money(total)}
+          </span>
+          {spending.map((row) => {
+            const known = EXPENSE_CATEGORIES.indexOf(row.category);
+            const colorIndex =
+              known < 0
+                ? [...row.category].reduce(
+                    (sum, c) => sum + c.charCodeAt(0),
+                    0,
+                  ) % 6
+                : known;
+            return (
+              <div className="spending-row" key={row.category}>
+                <span>{row.category}</span>
+                <strong>{money(row.amountMinor)}</strong>
+                <ProgressBar
+                  label={`${row.category} actual spending`}
+                  value={total ? (row.amountMinor / total) * 100 : 0}
+                  chartIndex={colorIndex}
+                  valueText={money(row.amountMinor)}
+                />
+              </div>
+            );
+          })}
+          {!spending.length && (
+            <p className="empty-copy">No recorded purchases in this range.</p>
+          )}
+        </details>
+      </section>
+    </>
   );
 }

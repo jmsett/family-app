@@ -1,6 +1,17 @@
 # Milestones and owner review gates
 
-## Compact expenses and independent fund confirmations — current review slice
+## Historical explorer and overview refinement — current review slice
+
+**Status: implemented; owner review pending.** Owner requested starting the historical explorer alongside the overview refinements.
+
+- Icon navigation: Home, Calendar/Monthly plan, Charts, Settings. Remove duplicate personal balance; mark the device member “you”. Center fund values in their value row, show monthly total/your-share captions, shorten transfer confirmations and separate history/category panels.
+- Explorer: actual expenses/category totals, cumulative savings, operating availability and monthly operating targets; D/W/M/Y intervals, line/bars, native pinch/pan, wheel zoom, crosshair, keyboard, zoom buttons and All fit. Advanced options hides dates/category/grid/exact values. Existing device colors/light theme apply.
+- Dated fund changes include opening balances, withdrawals, movements, account-specific purchases/repayments and operating liability reserves. Original-period reversals and assigned-month confirmation dates reconcile to Overview. Budget targets are distinct from actual spending or balances.
+- Schema 4 and saved credentials/history are preserved. The lazy chart chunk and attribution/license assets are precached, including first-visit offline chart use.
+- Verification: 76 domain/API/sync tests, 30 desktop/Android workflows and six production PWA cases. Tests cover totals, reconciliation, category filters, leap/year/week boundaries, partial periods, native phone pinch, narrow/light layouts, invalid ranges and offline charts. Physical Android use remains owner feedback.
+- Dependency audit: the chart renderer adds two runtime packages. npm reports 11 pre-existing development-only findings through the picomatch ReDoS advisory; neither new chart package is implicated. The suggested fix would downgrade unrelated tooling, so that change is outside this pass.
+
+## Compact expenses and independent fund confirmations — earlier review slice
 
 **Status: implemented; owner review pending.** Owner approved this pass and selected the historical chart explorer as the next separate step.
 
@@ -12,7 +23,7 @@
 
 **UI refinement:** Payment suggestions now start inside collapsed Settle up. History adds a small payer/total caption, keeps complementary information under Details and removes the duplicate final divider. Fund amounts are centered while captions remain in place.
 
-**Next:** Historical chart explorer with mobile pan/zoom and daily/weekly/monthly/yearly intervals; compare spending totals, cumulative savings, operating balances and operating budget targets. Keep advanced controls collapsed. This pass does not implement that explorer or configurable unequal responsibilities.
+**Superseded next step:** The historical chart explorer is implemented in the current review slice above. Configurable unequal responsibilities remain future work.
 
 ## Shared expenses and settlements — earlier review slice
 
