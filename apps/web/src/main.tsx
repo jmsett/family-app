@@ -58,6 +58,7 @@ function MonthlyPlan({
     amount: '',
     firstDueDate: `${month}-01`,
     category: 'Home & bills',
+    customCategory: '',
     labels: '',
     duration: 'indefinite',
     endDate: '',
@@ -104,7 +105,7 @@ function MonthlyPlan({
         name: expense.name.trim(),
         amountMinor: parseMoney(expense.amount),
         firstDueDate: expense.firstDueDate,
-        category: expense.category.trim(),
+        category: (expense.category || expense.customCategory).trim(),
         labels: [
           ...new Set(
             expense.labels
@@ -246,23 +247,42 @@ function MonthlyPlan({
             </div>
             <label>
               Category
-              <input
+              <select
                 aria-label="Category"
-                list="expense-categories"
-                maxLength={40}
                 value={expense.category}
                 onChange={(e) => {
                   setExpense({ ...expense, category: e.target.value });
                   setExpenseTouched(true);
                 }}
-                required
-              />
-              <datalist id="expense-categories">
-                {EXPENSE_CATEGORIES.map((category) => (
-                  <option key={category} value={category} />
+              >
+                {[
+                  ...new Set([
+                    ...EXPENSE_CATEGORIES,
+                    ...draft.expenses.map((entry) => entry.category),
+                  ]),
+                ].map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
                 ))}
-              </datalist>
+                <option value="">Custom category…</option>
+              </select>
             </label>
+            {expense.category === '' && (
+              <label>
+                Custom category
+                <input
+                  aria-label="Custom category"
+                  maxLength={40}
+                  value={expense.customCategory}
+                  onChange={(e) => {
+                    setExpense({ ...expense, customCategory: e.target.value });
+                    setExpenseTouched(true);
+                  }}
+                  required
+                />
+              </label>
+            )}
             <label>
               Labels <small>Optional, separated by commas</small>
               <input

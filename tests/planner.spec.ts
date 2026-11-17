@@ -19,7 +19,9 @@ test('overview shows only confirmed funds while monthly planning derives 50/50 t
   await page.getByLabel('Expense name', { exact: true }).fill('Rent');
   await page.getByLabel('Monthly amount', { exact: true }).fill('800.01');
   await page.getByLabel('First due date').fill('2030-01-31');
-  await page.getByLabel('Category', { exact: true }).fill('Home & bills');
+  await page
+    .getByLabel('Category', { exact: true })
+    .selectOption('Home & bills');
   await page.getByLabel('Labels', { exact: true }).fill('housing, fixed');
   await page.getByLabel('Payment duration').selectOption('limited');
   await page.getByLabel('Last payment date').fill('2030-02-28');
