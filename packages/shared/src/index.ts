@@ -43,11 +43,48 @@ export interface TransferConfirmation {
   confirmedAt: string;
 }
 export interface HouseholdPlan {
-  schemaVersion: 2;
+  schemaVersion: 3;
   revision: number;
   memberNames: [string, string];
   expenses: RecurringExpense[];
   savingsTargets: { month: string; amountMinor: number }[];
   transfers: TransferConfirmation[];
   legacyDrafts: BudgetDraft[];
+  ledger: LedgerEvent[];
 }
+
+export type Party = 'a' | 'b' | 'household';
+export type SplitMode = 'equal' | 'amount' | 'percentage';
+export type Shares = [number, number, number];
+interface LedgerBase {
+  id: string;
+  date: string;
+  createdAt: string;
+  actor: 'a' | 'b';
+}
+export interface PostedExpense extends LedgerBase {
+  kind: 'expense';
+  replacesId?: string;
+  description: string;
+  amountMinor: number;
+  payer: Party;
+  source: 'personal' | 'household';
+  splitMode: SplitMode;
+  splitInput: Shares;
+  shares: Shares;
+  category: string;
+  labels: string[];
+}
+export interface DebtSettlement extends LedgerBase {
+  kind: 'settlement';
+  from: Party;
+  to: Party;
+  amountMinor: number;
+  note: string;
+}
+export interface LedgerReversal extends LedgerBase {
+  kind: 'reversal';
+  targetId: string;
+  reason: string;
+}
+export type LedgerEvent = PostedExpense | DebtSettlement | LedgerReversal;

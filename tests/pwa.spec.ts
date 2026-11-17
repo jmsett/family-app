@@ -60,6 +60,13 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await expect(page.getByTestId('savings-funds')).toHaveText('€200.00');
   await page.reload();
   await expect(page.getByTestId('savings-funds')).toHaveText('€200.00');
+  await page.getByRole('button', { name: 'Add expense', exact: true }).click();
+  await page.getByLabel('Expense description').fill('Offline purchase');
+  await page.getByLabel('Expense amount', { exact: true }).fill('20');
+  await page.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await expect(page.getByTestId('balance-b')).toHaveText('Owed €10.00');
+  await page.reload();
+  await expect(page.getByTestId('balance-b')).toHaveText('Owed €10.00');
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -189,6 +196,64 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await expect(page.getByTestId('savings-funds')).toHaveText('€250.00');
   await expect(second.getByTestId('savings-funds')).toHaveText('€250.00');
   expect(writes).toBe(4);
+  // Independent offline purchases merge into one shared ledger.
+  await context.setOffline(true);
+  await secondContext.setOffline(true);
+  for (const [device, description, amount] of [
+    [page, 'Offline dinner', '20'],
+    [second, 'Offline tickets', '10'],
+  ] as const) {
+    await device
+      .getByRole('button', { name: 'Add expense', exact: true })
+      .click();
+    await device.getByLabel('Expense description').fill(description);
+    await device.getByLabel('Expense amount', { exact: true }).fill(amount);
+    await device
+      .getByRole('button', { name: 'Save expense', exact: true })
+      .click();
+    await expect(device.getByRole('form', { name: 'Add expense' })).toHaveCount(
+      0,
+    );
+  }
+  await context.setOffline(false);
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await secondContext.setOffline(false);
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  for (const device of [page, second]) {
+    await navigate(device, 'Overview');
+    await expect(device.getByTestId('balance-a')).toHaveText('Owed €5.00');
+    await device.getByText('Spending by category', { exact: true }).click();
+    await expect(device.getByTestId('actual-spending-total')).toHaveText(
+      '€30.00',
+    );
+  }
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Settle up', exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await page
+    .getByRole('button', { name: 'Record payment', exact: true })
+    .click();
+  await expect(page.getByTestId('balance-a')).toHaveText('Settled');
+  await context.setOffline(false);
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Overview');
+  await expect(second.getByTestId('balance-a')).toHaveText('Settled');
+  const uploaded = JSON.parse(
+    Buffer.from(remote!.content, 'base64').toString('utf8'),
+  );
+  expect(uploaded.ledger).toHaveLength(3);
+  expect(uploaded.schemaVersion).toBe(3);
   await secondContext.close();
 });
 

@@ -2,10 +2,10 @@
 
 ## Current product rules — 2026-11-17 owner feedback
 
-- Overview contains confirmed operating/savings funds and member transfer status. All plan definition belongs to Monthly plan; connection and member setup belong to Settings.
+- Overview contains recorded operating/savings funds, Balances & settlements, then member transfer status. All plan definition belongs to Monthly plan; identity, connection and member setup belong to the top-right Settings cog.
 - Operating targets equal the sum of monthly recurring payments due in that month. Each schedule has a custom name, amount in cents, first due date, category and labels. Repeat monthly until archived or through an inclusive end date. Clamp month-end due dates; retain archived schedules and historical months.
 - Savings are a fixed monthly amount with effective-month history, carrying forward until changed. The contribution split is always 50/50; allocate rounding cents deterministically while balancing both envelopes and the combined target.
-- Only a member's explicit declaration adds that member's full operating/savings share to the month's confirmed funds. One immutable confirmation per member/month; no bank verification or separate member authentication is claimed. Later CSV/bank/PayPal matching may verify declarations. Corrections, partial confirmations/top-ups and actual spending entry remain future work.
+- Only a member's explicit declaration adds that member's full operating/savings share to the month's confirmed funds. One immutable confirmation per member/month; no bank verification or separate member authentication is claimed. Later CSV/bank/PayPal matching may verify declarations. Corrections to monthly contribution confirmations and partial contributions/top-ups remain future work; expense corrections use immutable reversals.
 - The owner explicitly authorizes this product slice across the earlier milestone boundaries; it is awaiting review, not blanket acceptance of other features.
 
 ## Branding and personal appearance
@@ -14,11 +14,24 @@ Use the owner-supplied Multicolor JML logo for the header/favicon/PWA icons. Pre
 
 Appearance is personal to each device (`family-appearance-v1` in localStorage), with input validation, automatic persistence and a reset. It never changes household financial data or credentials. Real fund progress remains derived from confirmed transfers; no glow/fill is shown for unconfirmed zero funds. Reuse the bar component for future goals and charts. Respect system reduced motion and keep numeric labels independent of color.
 
-## Current storage and synchronization — schema v2
+## Current storage and synchronization — schema v3
 
-`household.json` is the authoritative private GitHub document for the entire household, replacing per-month draft synchronization below. It contains recurring schedules, effective-month savings targets, member names, immutable transfer confirmations and preserved legacy targets. IndexedDB `family-manager-v1` upgrades to version 2, adding a household store while leaving old budget rows intact. Old private monthly JSON is imported on first connection when no v2 household exists; old files are not deleted. Manual legacy operating targets do not invent recurring expenses or funds.
+`household.json` is the authoritative private GitHub document for the entire household, replacing per-month draft synchronization below. It contains recurring schedules, effective-month savings targets, member names, immutable transfer confirmations, expense/repayment/reversal events and preserved legacy targets. IndexedDB `family-manager-v1` upgrades to version 2, adding a household store while leaving old budget rows intact. Old private monthly JSON is imported on first connection when no household exists; old files are not deleted. Manual legacy operating targets do not invent recurring expenses or funds.
 
-Independent confirmations merge by stable `month:member` ID; identical amounts deduplicate, conflicting amounts stop synchronization. Competing plan settings use three-way conflict detection. Remote recovery retains local confirmations, and local persistence rejects changing/removing recorded transfer amounts. SHA-protected writes and idempotent content reconciliation remain mandatory. This is a declaration record, not the future full expense ledger.
+Independent confirmations merge by stable `month:member` ID; identical amounts deduplicate, conflicting amounts stop synchronization. Competing plan settings use three-way conflict detection. Remote recovery retains local confirmations, and local persistence rejects changing/removing recorded transfer amounts. SHA-protected writes and idempotent content reconciliation remain mandatory. Schema-v2 documents upgrade in place to v3 by adding an empty ledger; credentials, confirmations and legacy records are preserved.
+
+## Authorized expense and settlement pass
+
+The owner approved implementing shared expense entry, debt netting, repayments, immutable corrections, offline synchronization, actual spending charts and device identity in Settings. This explicitly spans the relevant portions of earlier ledger/reimbursement/reporting milestones; it does not authorize bank automation or unrelated goals/month-close features.
+
+- Model exactly three parties: member A, member B and Household. Expenses credit the funding party and debit the beneficiaries; net balances sum to zero. Equal, exact-amount and percentage splits use integer cents/basis points with deterministic largest-remainder rounding. Keep categories and labels separate from recurring forecasts.
+- Keep personal advances distinct from existing household funds. Record full/partial repayments without creating expenses. Derive the minimum one/two payments from net debt for these three parties; support remaining bilateral debts when the actual payment differs from the simplified route.
+- Recorded operating funds accumulate confirmed contributions through the selected month, subtract household-funded purchases and outgoing repayments, add incoming repayments, then reserve net household liabilities. Savings accumulate confirmed contributions separately. Monthly transfer status and funding progress retain their selected-month meaning. Debt carries across months.
+- Append immutable expense, settlement and reversal events with stable UUIDs, effective date, creator identity and timestamp. Corrections append an original-period reversal and replacement. Never remove/edit financial history. Recorders use device-selected identity under the cog Settings menu, explicitly trust-based.
+- Union independent offline financial events and deduplicate retries by immutable ID. Block changed payloads, competing corrections to the same expense and concurrent repayments that overpay the merged debt; preserve both copies and require reversal of an incorrect payment before retry. Plan recovery retains events. Existing revision/SHA protection still applies.
+- Collapse detailed history and actual category bars under the balances section. Date, party and category filters affect reports without hiding outstanding all-time debt. Reuse the owner's palette; retain Android touch targets, narrow-screen layouts and accessible labels.
+
+Validation includes domain conservation/rounding/funds/corrections, schema upgrades, sync conflicts, desktop/Android workflows and production-PWA offline/two-device sync. Actual private-repository pairing and physical-phone testing remain owner checks.
 
 ## Architecture decision — 2026-11-17
 
@@ -29,7 +42,7 @@ Accepted by the owner: follow the architecture already used in `nunz-app`.
 - IndexedDB holds local drafts and their last synchronized baseline. Saving works offline. Synchronization runs while the app is open, on reconnect/focus, periodically, and on request. Closing the app does not guarantee background sync.
 - Each device uses a separate expiring fine-grained personal access token restricted to `family-data`, with Contents read/write and implicit Metadata read. Enter tokens only in the PWA. Match `nunz-app`: verify private-repository access, then save the token in a separate device-only IndexedDB database, restore it on app start and remove it on disconnect. Never include saved tokens in household JSON, exports or the public build.
 - Check repository visibility before any private read/write. Reject public data repositories. Tokens never enter source, build variables, URLs, exports, logs or synchronized JSON. Private JSON is readable to GitHub and repository collaborators; this is not end-to-end encryption. Scripts on the same web origin can access local records and active credentials. Other project Pages sites under the same `owner.github.io` share that origin.
-- **Superseded by schema v2 above:** Store one schema-versioned JSON document per monthly draft at `budgets/YYYY-MM.json`. Compare the last synchronized draft with GitHub before writing, then pass the current blob SHA as a compare-and-swap guard. Different months synchronize independently; divergent edits to the same month require review. Never silently overwrite monetary edits.
+- **Superseded by schema v3 above:** Store one schema-versioned JSON document per monthly draft at `budgets/YYYY-MM.json`. Compare the last synchronized draft with GitHub before writing, then pass the current blob SHA as a compare-and-swap guard. Different months synchronize independently; divergent edits to the same month require review. Never silently overwrite monetary edits.
 - A lost response is reconciled by comparing remote content to the pending local draft. Malformed/unknown schemas, authorization failures, deleted remote files and write races preserve local changes. Git history helps recovery but independent JSON backups are still needed.
 
 This supersedes the VPN/Fastify/SQLite/passkey production topology in the original local specification `family_manager_v1_plan.md` and ADRs 002–005. The legacy API remains a development reference; existing SQLite drafts are not automatically migrated or deleted.
@@ -43,7 +56,7 @@ The owner confirmed branch deployment matching `nunz-app`: use **main / (root)**
 3. Owner creates `family-app` (public) and `family-data` (private, initialize with a README/main branch). Configure Pages to deploy from `main` / `(root)`, publish the source and root static build to `family-app`, then pair two devices using separate tokens. Verify actual private API access, installation, offline relaunch, and concurrent editing on the deployed origin.
 4. Continue the financial milestones after owner review: immutable balanced ledger, reimbursements, savings goals, recurring costs, reporting and month close. Preserve integer cents, deterministic rounding, explicit planned/earmarked/paid/owed states and correction history.
 
-The owner explicitly authorized beginning the architecture implementation while M0 visual acceptance remains pending. This does not imply acceptance of other milestones. The first sync slice covers monthly proposals, not real financial postings. Future ledger sync needs stable operation IDs, immutable events, idempotency and validation; do not generalize mutable draft replacement to posted expenses.
+The owner explicitly authorized beginning the architecture implementation while M0 visual acceptance remains pending. This does not imply acceptance of other milestones. The first sync slice covers monthly proposals, not real financial postings. The authorized expense pass implements stable operation IDs, immutable events, idempotency and validation; mutable plan replacement never applies to posted entries.
 
 ## Review gates
 

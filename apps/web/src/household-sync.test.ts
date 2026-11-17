@@ -4,7 +4,7 @@ import {
   initialDraft,
   initialHousehold,
 } from '@family/domain';
-import { GitHubHousehold, reconcile } from './household-sync';
+import { decodeHousehold, GitHubHousehold, reconcile } from './household-sync';
 import type { LocalRecord } from './storage';
 const base = {
   ...initialHousehold(),
@@ -91,7 +91,7 @@ describe('household GitHub format', () => {
     expect(result?.document.expenses).toEqual([]);
     expect(result?.document.transfers).toEqual([]);
   });
-  it('round trips schema v2, preserves Unicode, uses SHA and excludes secrets', async () => {
+  it('round trips schema v3, preserves Unicode, uses SHA and excludes secrets', async () => {
     let encoded = '';
     const doc = { ...base, memberNames: ['José', '愛'] as [string, string] };
     const fetcher = vi
@@ -116,4 +116,32 @@ describe('household GitHub format', () => {
     expect((await api.readHousehold())?.document).toEqual(doc);
     expect(atob(encoded)).not.toContain('fake-token-secret');
   });
+});
+
+it('upgrades schema2 JSON and preserves immutable ledger entries during remote plan recovery', () => {
+  const old = { ...base, schemaVersion: 2, ledger: undefined };
+  expect(decodeHousehold(old)).toEqual(base);
+  const entry = {
+    id: 'dinner',
+    kind: 'expense' as const,
+    date: '2026-11-17',
+    createdAt: '2026-11-17T12:00:00Z',
+    actor: 'a' as const,
+    description: 'Dinner',
+    amountMinor: 8000,
+    payer: 'a' as const,
+    source: 'personal' as const,
+    splitMode: 'equal' as const,
+    splitInput: [1, 1, 0] as [number, number, number],
+    shares: [4000, 4000, 0] as [number, number, number],
+    category: 'Food',
+    labels: [],
+  };
+  const recovered = reconcile(
+    local({ document: { ...base, ledger: [entry] } }),
+    { document: { ...base, memberNames: ['Alex', 'Sam'] }, sha: 'b' },
+    true,
+  );
+  expect(recovered.ledger).toEqual([entry]);
+  expect(recovered.memberNames).toEqual(['Alex', 'Sam']);
 });

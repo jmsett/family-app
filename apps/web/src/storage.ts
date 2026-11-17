@@ -2,6 +2,8 @@ import {
   initialHousehold,
   migrateLegacyDrafts,
   validateHousehold,
+  upgradeHousehold,
+  canonicalEvent,
 } from '@family/domain';
 import type { BudgetDraft, HouseholdPlan } from '@family/shared';
 
@@ -43,6 +45,21 @@ export async function readRecord(): Promise<LocalRecord> {
       request.onsuccess = () => {
         if (request.result) {
           record = request.result;
+          const oldVersion = record.document?.schemaVersion;
+          try {
+            record = {
+              ...record,
+              document: upgradeHousehold(record.document),
+              base: record.base ? upgradeHousehold(record.base) : null,
+            };
+          } catch {
+            tx.abort();
+            return;
+          }
+          if (oldVersion !== 3) {
+            record.pending = true;
+            store.put(record, 'current');
+          }
           return;
         }
         const legacy = tx.objectStore('budgets').getAll();
@@ -113,6 +130,21 @@ export async function writeRecord(
         ) {
           failure =
             'Recorded transfer amounts cannot be removed or changed. Export both copies for review.';
+          tx.abort();
+          return;
+        }
+        if (
+          (current?.document.ledger ?? []).some(
+            (recorded) =>
+              !next.document.ledger.some(
+                (event) =>
+                  event.id === recorded.id &&
+                  canonicalEvent(event) === canonicalEvent(recorded),
+              ),
+          )
+        ) {
+          failure =
+            'Financial history cannot be removed or edited. Record a reversal or correction instead.';
           tx.abort();
           return;
         }

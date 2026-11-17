@@ -6,12 +6,14 @@ import {
   EXPENSE_CATEGORIES,
   monthlyPlan,
   parseMoney,
+  recordedFunds,
   savingsFor,
   validateExpense,
   validateHousehold,
 } from '@family/domain';
 import type { HouseholdPlan, RecurringExpense } from '@family/shared';
 import { readRecord, saveHousehold } from './storage';
+import { LedgerPanel } from './LedgerPanel';
 import { SyncPanel } from './SyncPanel';
 import { useAppearance } from './appearance';
 import { AppearancePanel } from './AppearancePanel';
@@ -444,18 +446,21 @@ function Overview({
   disabled,
   commit,
   openPlan,
+  openSettings,
+  member,
+  onDirty,
 }: {
   document: HouseholdPlan;
   month: string;
   disabled: boolean;
   commit: Commit;
   openPlan: () => void;
+  openSettings: () => void;
+  member: string;
+  onDirty: (dirty: boolean) => void;
 }) {
   const plan = monthlyPlan(document, month);
-  const [member, setMember] = useState<string>(() => {
-    const saved = localStorage.getItem('family-active-member');
-    return saved === '0' || saved === '1' ? saved : '';
-  });
+  const funds = recordedFunds(document, month);
   const recorded = plan.transfers.find((t) => String(t.member) === member);
   async function confirm() {
     if (member !== '0' && member !== '1') return;
@@ -475,7 +480,7 @@ function Overview({
         <article className="summary-card total">
           <span className="card-label">Operating funds</span>
           <strong data-testid="operating-funds">
-            {money(plan.confirmedOperatingMinor)}
+            {money(funds.unencumberedMinor)}
           </strong>
           <div className="funding-progress">
             <ProgressBar
@@ -488,13 +493,13 @@ function Overview({
               }
               valueText={
                 plan.operatingMinor
-                  ? `${Math.round((plan.confirmedOperatingMinor / plan.operatingMinor) * 100)}% confirmed`
+                  ? `${Math.round((plan.confirmedOperatingMinor / plan.operatingMinor) * 100)}% of month funded`
                   : 'No current target'
               }
             />
             <small>
               {plan.operatingMinor
-                ? `${Math.round((plan.confirmedOperatingMinor / plan.operatingMinor) * 100)}% confirmed`
+                ? `${Math.round((plan.confirmedOperatingMinor / plan.operatingMinor) * 100)}% of month funded`
                 : 'No current target'}
             </small>
           </div>
@@ -502,7 +507,7 @@ function Overview({
         <article className="summary-card">
           <span className="card-label">Savings funds</span>
           <strong data-testid="savings-funds">
-            {money(plan.confirmedSavingsMinor)}
+            {money(funds.savingsMinor)}
           </strong>
           <div className="funding-progress">
             <ProgressBar
@@ -515,21 +520,39 @@ function Overview({
               }
               valueText={
                 plan.savingsMinor
-                  ? `${Math.round((plan.confirmedSavingsMinor / plan.savingsMinor) * 100)}% confirmed`
+                  ? `${Math.round((plan.confirmedSavingsMinor / plan.savingsMinor) * 100)}% of month funded`
                   : 'No current target'
               }
             />
             <small>
               {plan.savingsMinor
-                ? `${Math.round((plan.confirmedSavingsMinor / plan.savingsMinor) * 100)}% confirmed`
+                ? `${Math.round((plan.confirmedSavingsMinor / plan.savingsMinor) * 100)}% of month funded`
                 : 'No current target'}
             </small>
           </div>
         </article>
       </section>
       <p className="funds-note">
-        Only member-confirmed transfers. Self-reported, not bank-verified.
+        Recorded funds through {monthName(month)}, after spending and
+        outstanding household debts. Self-reported, not bank-verified.
+        {funds.householdPayables > 0 && (
+          <span className="funds-reserve">
+            Operating pool {money(funds.operatingMinor)} · reserved for net
+            household debts {money(funds.householdPayables)}.
+          </span>
+        )}
       </p>
+      <LedgerPanel
+        key={month}
+        document={document}
+        member={member === '0' ? 'a' : member === '1' ? 'b' : ''}
+        month={month}
+        today={today}
+        disabled={disabled}
+        commit={commit}
+        openSettings={openSettings}
+        onDirty={onDirty}
+      />
       <section className="panel" aria-label="Member transfers">
         <div className="section-heading">
           <h2>Member transfers</h2>
@@ -560,25 +583,14 @@ function Overview({
           })}
         </div>
         <div className="confirmation-form">
-          <label>
-            I am
-            <select
-              aria-label="Confirming member"
-              value={member}
-              disabled={disabled}
-              onChange={(e) => {
-                setMember(e.target.value);
-                localStorage.setItem('family-active-member', e.target.value);
-              }}
-            >
-              <option value="">Choose your name</option>
-              {document.memberNames.map((name, i) => (
-                <option key={i} value={i}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!member && (
+            <p className="muted">
+              <button className="inline-link" onClick={openSettings}>
+                Choose your name in Settings
+              </button>{' '}
+              to confirm a transfer.
+            </p>
+          )}
           {recorded ? (
             <p className="muted">
               Your transfer is recorded. Plan changes do not alter confirmed
@@ -614,7 +626,8 @@ function Overview({
             </p>
           )}
           <p className="muted">
-            Choose your own name. Confirm only after making the transfer.
+            Confirm only after making the transfer. Monthly funding does not
+            settle personal debts.
           </p>
         </div>
       </section>
@@ -622,11 +635,15 @@ function Overview({
   );
 }
 function Settings({
+  member,
+  setMember,
   document,
   disabled,
   commit,
   onDirty,
 }: {
+  member: string;
+  setMember: (value: string) => void;
   document: HouseholdPlan;
   disabled: boolean;
   commit: Commit;
@@ -639,6 +656,29 @@ function Settings({
   useEffect(() => () => onDirty(false), [onDirty]);
   return (
     <section className="panel">
+      <div className="identity-settings">
+        <h2>I am</h2>
+        <label>
+          Your identity on this device
+          <select
+            aria-label="Your identity"
+            value={member}
+            disabled={disabled}
+            onChange={(e) => setMember(e.target.value)}
+          >
+            <option value="">Choose your name</option>
+            {document.memberNames.map((name, i) => (
+              <option key={i} value={i}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">
+          Saved on this device. Choose your own name; v1 uses trust, without
+          identity verification.
+        </p>
+      </div>
       <h2>Household members</h2>
       <form
         className="settings-form"
@@ -702,6 +742,22 @@ function Settings({
 }
 function App() {
   const appearance = useAppearance();
+  const [member, setMember] = useState(() => {
+    try {
+      const saved = localStorage.getItem('family-active-member');
+      return saved === '0' || saved === '1' ? saved : '';
+    } catch {
+      return '';
+    }
+  });
+  function chooseMember(value: string) {
+    setMember(value);
+    try {
+      localStorage.setItem('family-active-member', value);
+    } catch {
+      /* In-memory identity still works. */
+    }
+  }
   const [document, setDocument] = useState<HouseholdPlan | null>(null);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [view, setView] = useState<Page>('overview');
@@ -757,7 +813,7 @@ function App() {
   function changeView(next: Page) {
     if (
       next !== view &&
-      (!dirty || window.confirm('Discard unsaved plan changes?'))
+      (!dirty || window.confirm('Discard unsaved changes?'))
     ) {
       setView(next);
       setDirty(false);
@@ -784,23 +840,42 @@ function App() {
               />
               <span>Family</span>
             </a>
-            <nav aria-label="Main navigation">
-              {(['overview', 'plan', 'settings'] as const).map((page) => (
-                <button
-                  key={page}
-                  className={view === page ? 'selected' : ''}
-                  aria-current={view === page ? 'page' : undefined}
-                  disabled={busy || syncBusy}
-                  onClick={() => changeView(page)}
+            <div className="header-actions">
+              <nav aria-label="Main navigation">
+                {(['overview', 'plan'] as const).map((page) => (
+                  <button
+                    key={page}
+                    className={view === page ? 'selected' : ''}
+                    aria-current={view === page ? 'page' : undefined}
+                    disabled={busy || syncBusy}
+                    onClick={() => changeView(page)}
+                  >
+                    {page === 'overview' ? 'Overview' : 'Monthly plan'}
+                  </button>
+                ))}
+              </nav>
+              <button
+                className="settings-cog"
+                aria-label="Settings"
+                title="Settings"
+                aria-current={view === 'settings' ? 'page' : undefined}
+                disabled={busy || syncBusy}
+                onClick={() => changeView('settings')}
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  aria-hidden="true"
                 >
-                  {page === 'overview'
-                    ? 'Overview'
-                    : page === 'plan'
-                      ? 'Monthly plan'
-                      : 'Settings'}
-                </button>
-              ))}
-            </nav>
+                  <path d="m9 3-.6 2.4-2 .9L4 5.7 2 9l1.8 1.8v2.4L2 15l2 3.3 2.4-.6 2 .9L9 21h6l.6-2.4 2-.9 2.4.6 2-3.3-1.8-1.8v-2.4L22 9l-2-3.3-2.4.6-2-.9L15 3Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </button>
+            </div>
           </div>
         </header>
         <main className="focused-main">
@@ -827,7 +902,7 @@ function App() {
                       e.target.value &&
                       (!dirty ||
                         window.confirm(
-                          'Discard unsaved plan changes and switch months?',
+                          'Discard unsaved changes and switch months?',
                         ))
                     ) {
                       setMonth(e.target.value);
@@ -876,6 +951,9 @@ function App() {
                   disabled={busy || syncBusy}
                   commit={commit}
                   openPlan={() => changeView('plan')}
+                  openSettings={() => changeView('settings')}
+                  member={member}
+                  onDirty={setDirty}
                 />
               )}
               {view === 'plan' && (
@@ -890,6 +968,8 @@ function App() {
               )}
               {view === 'settings' && (
                 <Settings
+                  member={member}
+                  setMember={chooseMember}
                   document={document}
                   disabled={busy || syncBusy}
                   commit={commit}

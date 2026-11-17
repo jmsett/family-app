@@ -1,18 +1,28 @@
 # Family Manager
 
-A household finance PWA for two adults. Plan a monthly budget, distinguish contribution targets from money actually earmarked, and eventually track expenses, reimbursements, savings goals and subscriptions. No bank connection is required. Money uses integer cents; targets never imply available cash.
+A household finance PWA for two adults. Plan a monthly budget, distinguish contribution targets from money actually earmarked, track shared expenses and reimbursements, with savings goals and subscriptions planned. No bank connection is required. Money uses integer cents; targets never imply available cash.
 
-**Current implementation:** recurring monthly expense planning, fixed monthly savings, 50/50 contributions and member-confirmed transfers, with offline storage and private GitHub synchronization. Browser-ready files are committed at the repository root for branch-based Pages hosting, matching `nunz-app`. The PWA has been deployed and the owner confirmed installation. Live private repository pairing is still an owner setup step; expense posting and the ledger remain future work.
+**Current implementation:** recurring monthly planning, fixed savings, 50/50 contributions, member-confirmed funding, shared expenses and debt settlements, with offline storage and private GitHub synchronization. Browser-ready files are committed at the repository root for branch-based Pages hosting, matching `nunz-app`. The PWA has been deployed and the owner confirmed installation. Live private repository pairing is still an owner setup step; the new expense/settlement flow is ready for owner review.
 
 ## App organization and trust model
 
-- **Overview:** confirmed operating and savings funds for the selected month, plus each member's transfer status. Amounts start at zero and increase only when a member explicitly confirms their own transfer. Choose your name before confirming; V1 uses declarations, not authenticated identity or bank verification.
+- **Overview:** recorded operating/savings funds through the selected month, **Balances & settlements**, then **Member transfers** for that month. Personal debts carry across months. Add expenses or record full/partial payments already made. Suggestions minimize transfers among the two members and Household; they never initiate payments. Funds start at zero: targets do not create cash.
 - **Monthly plan:** define recurring expenses with a name, monthly amount, first due date, category and optional labels. Choose monthly recurrence until archived or a final payment date. The operating budget is the sum of payments due in the selected month. Set savings as a separate fixed monthly amount; it carries forward until changed. Contributions always split 50/50, with deterministic cent rounding across the two envelopes and total.
-- **Settings:** member names, appearance preferences, private GitHub connection, whole-household JSON backup and preserved earlier manual targets. Categories and labels are retained for future actual spending comparisons and charts; scheduled payments are not actual spending.
+- **Settings (top-right cog):** “I am” identity for this device, member names, appearance, private GitHub connection, JSON backup and preserved earlier manual targets. Identity selection saves locally; V1 uses declarations, without authenticated identity or bank verification. History and actual category spending charts are collapsed on Overview and share date/person/category filters.
 
 Monthly due dates repeat on the original day, clamped to the last day in shorter months. End dates are inclusive. Archiving stops a schedule from the selected month and retains the original record and earlier months. Changing a savings target creates an effective-month entry and preserves prior targets.
 
-A transfer confirmation records both operating and savings amounts for one member/month. Duplicate confirmations are blocked. Later plan edits never change those recorded amounts. Corrections, partial transfers, top-ups and CSV/bank/PayPal verification are future work; confirm only after the full displayed transfer has been made.
+A transfer confirmation records both operating and savings amounts for one member/month. Duplicate confirmations are blocked. Later plan edits never change those recorded amounts. Corrections to monthly funding confirmations, partial contributions, top-ups and CSV/bank/PayPal verification are future work; confirm only after the full displayed transfer has been made.
+
+## Expenses and settling up
+
+Choose your identity in Settings, then **Overview → Add expense**. Enter a description, amount, payment date, payer, category and optional labels. Split equally among selected parties, by exact amounts, or by percentages totaling 100%. Quick setups cover “I paid, split equally”, “I am owed the full amount”, “I paid for the household” and “Household paid”. Monetary splits preserve every cent; percentage input supports two decimal places.
+
+A personal advance benefiting Household creates a household debt. A purchase using existing household funds reduces the recorded operating pool and creates no duplicate reimbursement. Operating funds carry forward from confirmed contributions, less household-funded purchases and outgoing repayments, plus incoming repayments, with net household debts reserved. Savings carry confirmed contributions forward separately. A negative operating amount means recorded spending/debt exceeds confirmed funding; it is not a bank balance. Funding bars show only the selected month's contribution progress.
+
+Use **Settle up** after a full or partial payment. The app supports the simplified suggestion or a remaining direct debt; overpayments are blocked. Repayments never count as spending. **Correct** adds a reversal plus replacement expense; **Reverse** cancels an incorrect expense or repayment. The original, recorder, timestamp and reason remain in history. Reversals take effect in the original entry's period. Debt remains visible when changing months or history filters. Monthly contribution confirmations remain separate from debt repayments.
+
+Offline entries have stable IDs. Independent entries merge and retries deduplicate. Conflicting immutable payloads, competing corrections to the same expense, or concurrent repayments exceeding the remaining debt stop sync, preserving both copies for review. Reverse a duplicate/incorrect payment on the device that recorded it, then sync again. Remote plan recovery preserves all financial events. These are trusted records, not bank-verified transactions.
 
 ## JML branding and appearance
 
@@ -20,18 +30,18 @@ The app header, favicon and installable PWA icons use the supplied **Multicolor 
 
 Open **Settings → Appearance** to choose **Electric halo, Liquid prism, Solar flare, Pixel rush, or Solid**, plus Dark/Light/Device themes. Pick a palette or customize the interface accent, operating/savings gradient stops and six category chart colors. Glow intensity, animation speed and motion are adjustable; device reduced-motion settings always take priority. Live previews include a progress slider and clearly labeled sample chart bars.
 
-Preferences save automatically on each device and are separate from household JSON and GitHub credentials. **Reset appearance** restores the JML/Electric halo default without changing financial records or the GitHub connection. The confirmed-fund progress bars use the selected styles now; savings-goal tracking and actual spending reports remain future features.
+Preferences save automatically on each device and are separate from household JSON and GitHub credentials. **Reset appearance** restores the JML/Electric halo default without changing financial records or the GitHub connection. The confirmed-fund progress bars use the selected styles now; actual category spending uses these colors too; savings-goal tracking remains future work.
 
 ## Architecture
 
 Following the existing `nunz-app` approach:
 
 - **family-app (public):** React/TypeScript source and static PWA hosted on GitHub Pages. No household records or credentials in source or deployment artifacts.
-- **family-data (private):** A schema-v2 household document at `household.json` containing recurring schedules, effective savings targets, transfer confirmations and preserved earlier drafts, synchronized through GitHub's Contents API. No production API server, SQLite database or VPN is needed.
+- **family-data (private):** A schema-v3 household document at `household.json` containing recurring schedules, effective savings targets, transfer confirmations, immutable expense/repayment/reversal events and preserved earlier drafts, synchronized through GitHub's Contents API. No production API server, SQLite database or VPN is needed.
 - **Devices:** IndexedDB saves work offline. Each device uses a separate expiring fine-grained token scoped only to `family-data` with Contents read/write. Enter it only in the PWA. After checking private-repository access, the app saves the token in a separate device-only IndexedDB database and reconnects automatically when reopened. Disconnect removes the saved token. Tokens are never exported or synchronized.
-- **Conflicts:** independent member confirmations merge by stable member/month ID, without double counting. Concurrent divergent plan edits require review. Remote recovery can replace unsynced plan settings, but retains device transfer confirmations; conflicting amounts for the same confirmation are blocked. SHA guards all writes.
+- **Conflicts:** independent member confirmations merge by stable member/month ID, without double counting. Concurrent divergent plan edits require review. Independent expense and repayment events merge by immutable ID. Remote recovery can replace unsynced plan settings, but retains device financial history; conflicting amounts for the same confirmation are blocked. SHA guards all writes.
 
-See [plan.md](plan.md), [architecture](docs/architecture.md) and [milestone.md](milestone.md). The owner authorized this architecture slice; other financial milestones still require review.
+See [plan.md](plan.md), [architecture](docs/architecture.md) and [milestone.md](milestone.md). The owner authorized this expense/settlement pass; remaining financial milestones still require review.
 
 ## Run locally
 
@@ -54,7 +64,7 @@ Open **http://localhost:4173/family-app/** online once, then test offline reload
 ```bash
 bash scripts/npm.sh run check # types, lint, unit/API/sync tests, build, formatting
 bash scripts/npm.sh exec -- playwright install chromium
-bash scripts/npm.sh run test:e2e # desktop + mobile planner regression
+bash scripts/npm.sh run test:e2e # desktop + Android planning/expense regression
 bash scripts/npm.sh run test:pwa # static subpath, offline shell, mocked multi-device sync
 # To use installed Chrome, prefix either browser test command with:
 # PLAYWRIGHT_CHROME_PATH=/usr/bin/google-chrome
@@ -66,7 +76,7 @@ bash scripts/npm.sh run test:pwa # static subpath, offline shell, mocked multi-d
 2. In `family-app`, set **Settings → Pages → Build and deployment → Source → Deploy from a branch**, branch **main**, folder **/(root)**. The root contains the built app and `.nojekyll`. GitHub publishes it after a push, as with `nunz-app`. No data token or Actions secret is needed.
 3. Open **https://jmsett.github.io/family-app/** once deployment succeeds. Install through the browser's app installation menu; on iPhone use Safari → Share → Add to Home Screen.
 4. Create a separate fine-grained token for each device: resource owner **jmsett**, repository access **Only select repositories → family-data**, repository permission **Contents: Read and write**, with an expiration. GitHub includes Metadata read access. Do not grant access to `family-app` or other repositories.
-5. On the first device, define and save your recurring expenses and savings in **Monthly plan**, then open **Settings → Sync & backups**, enter the token and connect. The app verifies repository privacy and creates `household.json`. An untouched empty household is never uploaded automatically.
+5. On the first device, define and save your recurring expenses and savings in **Monthly plan**, choose your identity under the **Settings cog → I am**, then open **Sync & backups**, enter the token and connect. The app verifies repository privacy and creates `household.json`. An untouched empty household is never uploaded automatically.
 6. On the second device, connect in **Settings** before making edits. It downloads the whole household, including recurring schedules across months. Use **Sync now** to check both copies. The connection is remembered across reloads and app restarts. Re-enter a token only after disconnecting, clearing browser data or replacing an expired/revoked token.
 7. Test with sample data: confirm one member on each offline device, reconnect, and check that both confirmations appear once. Competing plan edits must produce a visible conflict. Export the device JSON before recovering remote plan settings.
 
@@ -82,7 +92,7 @@ bash scripts/npm.sh run build:pages
 
 This builds for `/family-app/` and copies only static PWA assets to the repository root. `.pages-files.json` tracks generated files so obsolete hashed assets can be removed without touching source or documentation. Commit the source and regenerated files together. CI verifies that the committed public build matches the source. The custom Actions deployment workflow has been removed; Actions still runs verification, and GitHub runs its standard branch Pages deployment.
 
-Synchronization runs after saves, on reconnect/focus/visibility changes, every two minutes while visible, and on request. It runs only while the app is open. Save form changes before syncing. Failures preserve saved local drafts; unsaved fields still require Save. Browser storage can be evicted or cleared, so pending changes are not backed up. Export the whole household for an independent backup; Git history alone is not a backup policy. Existing browser drafts and old private `budgets/YYYY-MM.json` files migrate into preserved legacy targets without becoming expenses or confirmed funds. Old private files are left untouched. Close older app tabs if the storage upgrade is blocked. Generic JSON import and automatic SQLite migration are not implemented yet.
+Synchronization runs after saves, on reconnect/focus/visibility changes, every two minutes while visible, and on request. It runs only while the app is open. Save form changes before syncing. Failures preserve saved local drafts; unsaved fields still require Save. Browser storage can be evicted or cleared, so pending changes are not backed up. Export the whole household for an independent backup; Git history alone is not a backup policy. Existing browser drafts and old private `budgets/YYYY-MM.json` files migrate into preserved legacy targets without becoming expenses or confirmed funds. Schema-v2 household documents upgrade to v3 without inventing entries or removing financial history. Old private files are left untouched. Close older app tabs if the storage upgrade is blocked. Generic JSON import and automatic SQLite migration are not implemented yet.
 
 Private JSON is not end-to-end encrypted. GitHub and collaborators can read it; tokens grant repository-wide access, with no separate per-member authorization. Local records remain after disconnect. Same-origin scripts can access those records and saved credentials, and project Pages sites on `jmsett.github.io` share an origin. Revoke a lost device's token in GitHub. Never paste tokens into chat, commit them, or put them in build variables.
 

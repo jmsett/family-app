@@ -50,7 +50,8 @@ test('overview shows only confirmed funds while monthly planning derives 50/50 t
     fullPage: true,
   });
   await page.getByLabel('Planning month').fill('2030-02');
-  await expect(page.getByTestId('operating-funds')).toHaveText('€0.00');
+  await expect(page.getByTestId('operating-funds')).toHaveText('€800.01');
+  await expect(page.getByText('0 of 2 confirmed')).toBeVisible();
   await navigate(page, 'Monthly plan');
   await expect(
     page.getByText('Due 2030-02-28', { exact: false }),

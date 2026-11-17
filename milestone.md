@@ -1,5 +1,17 @@
 # Milestones and owner review gates
 
+## Shared expenses and settlements — current review slice
+
+**Status: implemented; owner review pending.** Authorized by “Ok, go ahead” after the expense/settlement proposal.
+
+- Overview: recorded funds, Balances & settlements, then Member transfers. Expense entry supports equal/exact/percentage splits, quick setups, categories and labels across A/B/Household. Net suggestions minimize payments; full/partial repayments are separate from spending.
+- Personal advances reserve household liabilities; existing household-funded purchases reduce the pool without duplicate reimbursement. Contributions/funds and outstanding debt carry forward; monthly funding status remains separate.
+- Immutable UUID events retain originals, actors/timestamps and original-period reversals/corrections. Independent offline entries merge; concurrent overpayments and payload conflicts stop for review. Recovery cannot discard financial events. Schema-v2 household data upgrades to v3.
+- The top-right Settings cog contains device-only “I am”. History and actual category charts collapse to keep Android Overview compact, using the existing palette and date/person/category filters.
+- Verification: 61 unit/API/domain/sync tests and 18 desktop/Android browser workflows pass locally. Production PWA checks cover offline reload, two-device expense merging, repayment synchronization, exports and saved-token behavior. Live private-repository pairing and actual Android interaction remain owner review steps.
+
+Try: select identity under the cog; add an €80 equal dinner, record a €15 partial repayment, correct the expense to €100 and check €35 outstanding with €100 actual spending. Separately record an €80 personal household advance, then repay it: operating availability must not decrease twice. Switch months and verify debt carries; close/reopen all PWA windows to receive the update.
+
 **2026-11-17 owner direction:** Implement the public Pages PWA / private GitHub JSON architecture now, using `nunz-app` as reference. This explicitly authorizes the architecture slice spanning the former M1/M7/M8 boundaries while M0 feedback stays pending. See [plan.md](plan.md); legacy VPN/passkey/server requirements below are superseded for production. Other financial milestones still require owner review.
 
 ## Android installation identity fix
@@ -14,7 +26,7 @@ Owner requested the supplied Multicolor JML logo, its palette and all effects fr
 
 Owner requested parity with Nunz: validate private-repository access, then remember the token in a separate device-only IndexedDB store and reconnect on app reopen. Disconnect removes the stored token without deleting household records; other open app tabs are notified. Credentials never enter exported or synchronized JSON. Browser tests cover reload/reconnect, disconnect/reload, rejected tokens and credential exclusion from backups/uploads.
 
-## Recurring planning and trust confirmations — current review slice
+## Recurring planning and trust confirmations — earlier review slice
 
 **Status: implemented; owner review pending.** The owner requested separate Overview/Monthly plan screens, operating budgets derived from recurring expenses, fixed savings and 50/50 contributions. This explicitly authorizes the relevant planning, recurring and confirmation work across earlier milestone boundaries.
 

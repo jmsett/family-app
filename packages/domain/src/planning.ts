@@ -5,6 +5,7 @@ import type {
   TransferConfirmation,
 } from '@family/shared';
 import { MAX_MINOR, validateDraft } from './index';
+import { canonicalEvent, validateLedger } from './ledger';
 
 export const EXPENSE_CATEGORIES = [
   'Home & bills',
@@ -37,13 +38,14 @@ function amount(value: number) {
 }
 export function initialHousehold(): HouseholdPlan {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     revision: 0,
     memberNames: ['Member A', 'Member B'],
     expenses: [],
     savingsTargets: [],
     transfers: [],
     legacyDrafts: [],
+    ledger: [],
   };
 }
 export function validateExpense(expense: RecurringExpense): void {
@@ -110,13 +112,14 @@ export function dueDate(
 export function validateHousehold(doc: HouseholdPlan): void {
   if (
     !doc ||
-    doc.schemaVersion !== 2 ||
+    doc.schemaVersion !== 3 ||
     !Number.isSafeInteger(doc.revision) ||
     doc.revision < 0 ||
     !Array.isArray(doc.expenses) ||
     !Array.isArray(doc.savingsTargets) ||
     !Array.isArray(doc.transfers) ||
-    !Array.isArray(doc.legacyDrafts)
+    !Array.isArray(doc.legacyDrafts) ||
+    !Array.isArray(doc.ledger)
   )
     throw new Error('Invalid or unsupported household data.');
   validateDraft({
@@ -166,6 +169,7 @@ export function validateHousehold(doc: HouseholdPlan): void {
     ids.add(transfer.id);
   }
   for (const draft of doc.legacyDrafts) validateDraft(draft);
+  validateLedger(doc.ledger);
   // Validate aggregate limits, including forecasts at future effective boundaries.
   const months = new Set([
     ...doc.expenses.map((e) => e.firstDueDate.slice(0, 7)),
@@ -279,6 +283,9 @@ export function migrateLegacyDrafts(drafts: BudgetDraft[]): HouseholdPlan {
 export function canonicalHousehold(doc: HouseholdPlan): string {
   return JSON.stringify({
     memberNames: doc.memberNames,
+    ledger: [...doc.ledger]
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((e) => JSON.parse(canonicalEvent(e))),
     expenses: [...doc.expenses].sort((a, b) => a.id.localeCompare(b.id)),
     savingsTargets: [...doc.savingsTargets].sort((a, b) =>
       a.month.localeCompare(b.month),
@@ -288,4 +295,17 @@ export function canonicalHousehold(doc: HouseholdPlan): string {
       a.month.localeCompare(b.month),
     ),
   });
+}
+
+// Read-only structural migration: no recorded money or entries are invented.
+export function upgradeHousehold(value: unknown): HouseholdPlan {
+  if (!value || typeof value !== 'object')
+    throw new Error('Invalid household data.');
+  const raw = value as Record<string, unknown>;
+  const next =
+    raw.schemaVersion === 2
+      ? { ...raw, schemaVersion: 3, ledger: raw.ledger ?? [] }
+      : raw;
+  validateHousehold(next as unknown as HouseholdPlan);
+  return next as unknown as HouseholdPlan;
 }

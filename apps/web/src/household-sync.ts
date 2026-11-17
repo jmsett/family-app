@@ -2,6 +2,9 @@ import {
   canonicalHousehold,
   migrateLegacyDrafts,
   validateHousehold,
+  upgradeHousehold,
+  mergeLedger,
+  canonicalEvent,
 } from '@family/domain';
 import type { HouseholdPlan } from '@family/shared';
 import type { LocalRecord } from './storage';
@@ -14,7 +17,7 @@ export interface RemoteHousehold {
 const same = (a: HouseholdPlan, b: HouseholdPlan) =>
   canonicalHousehold(a) === canonicalHousehold(b);
 const config = (doc: HouseholdPlan) =>
-  canonicalHousehold({ ...doc, transfers: [] });
+  canonicalHousehold({ ...doc, transfers: [], ledger: [] });
 export function reconcile(
   local: LocalRecord,
   remote: RemoteHousehold | null,
@@ -56,6 +59,7 @@ export function reconcile(
   result = {
     ...result,
     transfers: [...transfers.values()].sort((a, b) => a.id.localeCompare(b.id)),
+    ledger: mergeLedger(local.document.ledger, remote.document.ledger),
   };
   validateHousehold(result);
   return result;
@@ -63,10 +67,9 @@ export function reconcile(
 export { same as sameHousehold };
 
 export function decodeHousehold(value: unknown): HouseholdPlan {
-  const doc = value as HouseholdPlan;
-  validateHousehold(doc);
+  const doc = upgradeHousehold(value);
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     revision: doc.revision,
     memberNames: [doc.memberNames[0], doc.memberNames[1]],
     expenses: doc.expenses.map((e) => ({
@@ -91,6 +94,7 @@ export function decodeHousehold(value: unknown): HouseholdPlan {
       savingsMinor: t.savingsMinor,
       confirmedAt: t.confirmedAt,
     })),
+    ledger: doc.ledger.map((event) => JSON.parse(canonicalEvent(event))),
     legacyDrafts: doc.legacyDrafts.map((d) => ({
       month: d.month,
       totalMinor: d.totalMinor,
@@ -166,7 +170,7 @@ export class GitHubHousehold extends GitHubData {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        message: 'Update household plan and transfer confirmations',
+        message: 'Update household plan and financial history',
         branch: 'main',
         content: btoa(binary),
         ...(sha ? { sha } : {}),

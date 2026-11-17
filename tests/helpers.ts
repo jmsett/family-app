@@ -4,9 +4,12 @@ export async function navigate(
   name: 'Overview' | 'Monthly plan' | 'Settings',
 ) {
   await page.bringToFront();
-  const button = page
-    .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('button', { name, exact: true });
+  const button =
+    name === 'Settings'
+      ? page.getByRole('button', { name, exact: true })
+      : page
+          .getByRole('navigation', { name: 'Main navigation' })
+          .getByRole('button', { name, exact: true });
   await button.click();
   await expect(button).toHaveAttribute('aria-current', 'page');
 }
@@ -32,8 +35,9 @@ export async function connect(page: Page) {
   await page.getByRole('button', { name: 'Connect family-data' }).click();
 }
 export async function confirm(page: Page, member: '0' | '1') {
+  await navigate(page, 'Settings');
+  await page.getByLabel('Your identity').selectOption(member);
   await navigate(page, 'Overview');
-  await page.getByLabel('Confirming member').selectOption(member);
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Confirm my transfer' }).click();
   await expect(
