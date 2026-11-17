@@ -1,5 +1,13 @@
 # Foundation decisions and API contract
 
+## ADR 011: JML / Afterglow visual preferences
+
+The owner supplied `Multicolor JML Monogram App Icon.png` and the `afterglow-neon-pwa` reference. Package the existing artwork into 192/512 PNG icons plus a padded 512 maskable variant, without changing the original file. Use the same asset in the app header and favicon. The default interface is dark with the logo palette and Electric halo fills; Light and Device modes are available.
+
+`appearance.ts` validates and persists device-only preferences under localStorage key `family-appearance-v1`, applies semantic CSS variables and adapts browser theme color. User-controlled colors are strict six-digit hex values; numeric effect settings are clamped. Accent button text chooses contrasting ink. `ProgressBar` is shared by actual confirmed-funding indicators and appearance previews; all styles/color stops/category palettes consume the same preferences. Zero confirmed progress renders no fill. Theme changes do not write to household JSON or the credentials database. Cross-tab storage events update preferences.
+
+Effects derived from the reference are Electric halo, Liquid prism, Solar flare and Pixel rush, plus Solid. Glow, speed and motion are adjustable, with system reduced motion taking priority. Preview charts/goals are labeled sample data and do not imply implemented goal tracking or actual expense analytics. Preserving the existing compact Android layout and financial semantics is required.
+
 ## ADR 010: Remember device connections as Nunz does
 
 Owner feedback requests the connection behavior already used by `nunz-app`. After validating private-repository access, store the token in database `family-github-device-v1`, store `secrets`, key `github-token`. This database is separate from household data and excluded from all sync documents, exports and public assets. Restore it on app start, allowing automatic foreground synchronization without re-entry. Disconnect deletes the saved token and preserves household records. Other open app tabs receive a credential-change notification without broadcasting the token itself.

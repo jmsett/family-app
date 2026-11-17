@@ -8,11 +8,19 @@ A household finance PWA for two adults. Plan a monthly budget, distinguish contr
 
 - **Overview:** confirmed operating and savings funds for the selected month, plus each member's transfer status. Amounts start at zero and increase only when a member explicitly confirms their own transfer. Choose your name before confirming; V1 uses declarations, not authenticated identity or bank verification.
 - **Monthly plan:** define recurring expenses with a name, monthly amount, first due date, category and optional labels. Choose monthly recurrence until archived or a final payment date. The operating budget is the sum of payments due in the selected month. Set savings as a separate fixed monthly amount; it carries forward until changed. Contributions always split 50/50, with deterministic cent rounding across the two envelopes and total.
-- **Settings:** member names, private GitHub connection, whole-household JSON backup and preserved earlier manual targets. Categories and labels are retained for future actual spending comparisons and charts; scheduled payments are not actual spending.
+- **Settings:** member names, appearance preferences, private GitHub connection, whole-household JSON backup and preserved earlier manual targets. Categories and labels are retained for future actual spending comparisons and charts; scheduled payments are not actual spending.
 
 Monthly due dates repeat on the original day, clamped to the last day in shorter months. End dates are inclusive. Archiving stops a schedule from the selected month and retains the original record and earlier months. Changing a savings target creates an effective-month entry and preserves prior targets.
 
 A transfer confirmation records both operating and savings amounts for one member/month. Duplicate confirmations are blocked. Later plan edits never change those recorded amounts. Corrections, partial transfers, top-ups and CSV/bank/PayPal verification are future work; confirm only after the full displayed transfer has been made.
+
+## JML branding and appearance
+
+The app header, favicon and installable PWA icons use the supplied **Multicolor JML Monogram App Icon**. The default palette combines its violet, pink, amber and cyan with Afterglow's dark surfaces and Electric halo bars.
+
+Open **Settings → Appearance** to choose **Electric halo, Liquid prism, Solar flare, Pixel rush, or Solid**, plus Dark/Light/Device themes. Pick a palette or customize the interface accent, operating/savings gradient stops and six category chart colors. Glow intensity, animation speed and motion are adjustable; device reduced-motion settings always take priority. Live previews include a progress slider and clearly labeled sample chart bars.
+
+Preferences save automatically on each device and are separate from household JSON and GitHub credentials. **Reset appearance** restores the JML/Electric halo default without changing financial records or the GitHub connection. The confirmed-fund progress bars use the selected styles now; savings-goal tracking and actual spending reports remain future features.
 
 ## Architecture
 

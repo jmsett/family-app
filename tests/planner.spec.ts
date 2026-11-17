@@ -166,3 +166,80 @@ test('device upgrade preserves earlier drafts without inventing funds or recurri
     'Alex',
   );
 });
+
+test('appearance persists across reopening, updates real bar colors and respects reduced motion', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(
+    page.getByRole('img', { name: 'JML multicolor logo' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('progressbar', { name: 'Operating funding' }),
+  ).toHaveAttribute('aria-valuenow', '0');
+  await expect(
+    page
+      .getByRole('progressbar', { name: 'Operating funding' })
+      .locator('.bar-fill'),
+  ).toHaveCount(0);
+  await navigate(page, 'Settings');
+  const appearance = page.getByRole('region', {
+    name: 'Appearance',
+    exact: true,
+  });
+  await appearance.locator('summary').first().click();
+  await page.getByLabel('Theme', { exact: true }).selectOption('light');
+  await page.getByLabel('Bar effect', { exact: true }).selectOption('prism');
+  await page.getByLabel('Color palette', { exact: true }).selectOption('prism');
+  await page.getByText('Customize bar colors', { exact: true }).click();
+  const color = page.getByLabel('Savings start color', { exact: true });
+  await color.evaluate((element) => {
+    const input = element as HTMLInputElement;
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )!.set!.call(input, '#12abcd');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.getByLabel('Glow intensity', { exact: true }).fill('35');
+  await page.getByLabel('Animation speed', { exact: true }).fill('125');
+  await page.getByLabel('Animate bars', { exact: true }).uncheck();
+  await expect(
+    page.getByRole('progressbar', { name: 'Savings preview', exact: true }),
+  ).toHaveCSS('--stop-1', '#12abcd');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.getByTestId('operating-funds')).toHaveText('€0.00');
+  await expect(
+    page.getByRole('progressbar', { name: 'Savings funding' }),
+  ).toHaveCSS('--stop-1', '#12abcd');
+  await navigate(page, 'Settings');
+  await appearance.locator('summary').first().click();
+  await expect(page.getByLabel('Theme', { exact: true })).toHaveValue('light');
+  await expect(page.getByLabel('Bar effect', { exact: true })).toHaveValue(
+    'prism',
+  );
+  await expect(page.getByLabel('Glow intensity', { exact: true })).toHaveValue(
+    '35',
+  );
+  await expect(page.getByLabel('Animation speed', { exact: true })).toHaveValue(
+    '125',
+  );
+  await expect(
+    page.getByLabel('Animate bars', { exact: true }),
+  ).not.toBeChecked();
+  const fill = page
+    .getByRole('progressbar', { name: 'Savings preview', exact: true })
+    .locator('.bar-fill');
+  await expect(fill).toHaveCSS('animation-name', 'none');
+  await page.getByLabel('Animate bars', { exact: true }).check();
+  await expect(fill).toHaveCSS('animation-name', 'prism-drift');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(fill).toHaveCSS('animation-name', 'none');
+  await page.getByRole('button', { name: 'Reset appearance' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.getByLabel('Bar effect', { exact: true })).toHaveValue(
+    'halo',
+  );
+});

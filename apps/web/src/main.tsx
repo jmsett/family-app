@@ -13,6 +13,9 @@ import {
 import type { HouseholdPlan, RecurringExpense } from '@family/shared';
 import { readRecord, saveHousehold } from './storage';
 import { SyncPanel } from './SyncPanel';
+import { useAppearance } from './appearance';
+import { AppearancePanel } from './AppearancePanel';
+import { AppearanceContext, ProgressBar } from './ProgressBar';
 import './style.css';
 
 const money = (value: number) =>
@@ -474,12 +477,54 @@ function Overview({
           <strong data-testid="operating-funds">
             {money(plan.confirmedOperatingMinor)}
           </strong>
+          <div className="funding-progress">
+            <ProgressBar
+              label="Operating funding"
+              variant="operating"
+              value={
+                plan.operatingMinor
+                  ? (plan.confirmedOperatingMinor / plan.operatingMinor) * 100
+                  : 0
+              }
+              valueText={
+                plan.operatingMinor
+                  ? `${Math.round((plan.confirmedOperatingMinor / plan.operatingMinor) * 100)}% confirmed`
+                  : 'No current target'
+              }
+            />
+            <small>
+              {plan.operatingMinor
+                ? `${Math.round((plan.confirmedOperatingMinor / plan.operatingMinor) * 100)}% confirmed`
+                : 'No current target'}
+            </small>
+          </div>
         </article>
         <article className="summary-card">
           <span className="card-label">Savings funds</span>
           <strong data-testid="savings-funds">
             {money(plan.confirmedSavingsMinor)}
           </strong>
+          <div className="funding-progress">
+            <ProgressBar
+              label="Savings funding"
+              variant="savings"
+              value={
+                plan.savingsMinor
+                  ? (plan.confirmedSavingsMinor / plan.savingsMinor) * 100
+                  : 0
+              }
+              valueText={
+                plan.savingsMinor
+                  ? `${Math.round((plan.confirmedSavingsMinor / plan.savingsMinor) * 100)}% confirmed`
+                  : 'No current target'
+              }
+            />
+            <small>
+              {plan.savingsMinor
+                ? `${Math.round((plan.confirmedSavingsMinor / plan.savingsMinor) * 100)}% confirmed`
+                : 'No current target'}
+            </small>
+          </div>
         </article>
       </section>
       <p className="funds-note">
@@ -656,6 +701,7 @@ function Settings({
   );
 }
 function App() {
+  const appearance = useAppearance();
   const [document, setDocument] = useState<HouseholdPlan | null>(null);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [view, setView] = useState<Page>('overview');
@@ -720,152 +766,159 @@ function App() {
     }
   }
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="header-inner">
-          <a
-            className="brand"
-            href={import.meta.env.BASE_URL}
-            aria-label="Family Manager home"
-          >
-            <span className="brand-mark" aria-hidden="true">
-              fm
-            </span>
-            <span>Family</span>
-          </a>
-          <nav aria-label="Main navigation">
-            {(['overview', 'plan', 'settings'] as const).map((page) => (
-              <button
-                key={page}
-                className={view === page ? 'selected' : ''}
-                aria-current={view === page ? 'page' : undefined}
-                disabled={busy || syncBusy}
-                onClick={() => changeView(page)}
-              >
-                {page === 'overview'
-                  ? 'Overview'
-                  : page === 'plan'
-                    ? 'Monthly plan'
-                    : 'Settings'}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </header>
-      <main className="focused-main">
-        <section className="page-heading">
-          <h1>
-            {view === 'overview'
-              ? 'Overview'
-              : view === 'plan'
-                ? 'Monthly plan'
-                : 'Settings'}
-          </h1>
-          {view !== 'settings' && (
-            <label className="month-picker">
-              <span>Month</span>
-              <input
-                aria-label="Planning month"
-                type="month"
-                min="2000-01"
-                max="2100-12"
-                value={month}
-                disabled={busy || syncBusy}
-                onChange={(e) => {
-                  if (
-                    e.target.value &&
-                    (!dirty ||
-                      window.confirm(
-                        'Discard unsaved plan changes and switch months?',
-                      ))
-                  ) {
-                    setMonth(e.target.value);
-                    setDirty(false);
-                    setNotice('');
-                    setError('');
-                  }
-                }}
-              />
-            </label>
-          )}
-        </section>
-        {error && (
-          <div className="message error" role="alert">
-            {error}{' '}
-            <button
-              onClick={() => {
-                if (
-                  !dirty ||
-                  window.confirm('Discard unsaved changes and reload?')
-                )
-                  window.location.reload();
-              }}
+    <AppearanceContext.Provider value={appearance.preferences}>
+      <div className="app-shell">
+        <header className="app-header">
+          <div className="header-inner">
+            <a
+              className="brand"
+              href={import.meta.env.BASE_URL}
+              aria-label="Family Manager home"
             >
-              Reload saved data
-            </button>
+              <img
+                className="brand-mark"
+                src={`${import.meta.env.BASE_URL}icons/icon-192.png`}
+                alt="JML multicolor logo"
+                width="36"
+                height="36"
+              />
+              <span>Family</span>
+            </a>
+            <nav aria-label="Main navigation">
+              {(['overview', 'plan', 'settings'] as const).map((page) => (
+                <button
+                  key={page}
+                  className={view === page ? 'selected' : ''}
+                  aria-current={view === page ? 'page' : undefined}
+                  disabled={busy || syncBusy}
+                  onClick={() => changeView(page)}
+                >
+                  {page === 'overview'
+                    ? 'Overview'
+                    : page === 'plan'
+                      ? 'Monthly plan'
+                      : 'Settings'}
+                </button>
+              ))}
+            </nav>
           </div>
-        )}
-        {notice && (
-          <div className="message success" role="status">
-            {notice}
-          </div>
-        )}
-        {!document ? (
-          <section className="panel">
-            <h2>
-              {busy ? 'Opening household…' : 'Household data unavailable'}
-            </h2>
+        </header>
+        <main className="focused-main">
+          <section className="page-heading">
+            <h1>
+              {view === 'overview'
+                ? 'Overview'
+                : view === 'plan'
+                  ? 'Monthly plan'
+                  : 'Settings'}
+            </h1>
+            {view !== 'settings' && (
+              <label className="month-picker">
+                <span>Month</span>
+                <input
+                  aria-label="Planning month"
+                  type="month"
+                  min="2000-01"
+                  max="2100-12"
+                  value={month}
+                  disabled={busy || syncBusy}
+                  onChange={(e) => {
+                    if (
+                      e.target.value &&
+                      (!dirty ||
+                        window.confirm(
+                          'Discard unsaved plan changes and switch months?',
+                        ))
+                    ) {
+                      setMonth(e.target.value);
+                      setDirty(false);
+                      setNotice('');
+                      setError('');
+                    }
+                  }}
+                />
+              </label>
+            )}
           </section>
-        ) : (
-          <>
-            {view === 'overview' && (
-              <Overview
-                document={document}
-                month={month}
-                disabled={busy || syncBusy}
-                commit={commit}
-                openPlan={() => changeView('plan')}
-              />
-            )}
-            {view === 'plan' && (
-              <MonthlyPlan
-                key={month}
-                document={document}
-                month={month}
-                disabled={busy || syncBusy}
-                commit={commit}
-                onDirty={setDirty}
-              />
-            )}
-            {view === 'settings' && (
-              <Settings
-                document={document}
-                disabled={busy || syncBusy}
-                commit={commit}
-                onDirty={setDirty}
-              />
-            )}
-          </>
-        )}
-        <div className="settings-pane" hidden={view !== 'settings'}>
-          <SyncPanel
-            dirty={dirty || busy}
-            refreshKey={refreshKey}
-            onBusy={setSyncBusy}
-            onStatus={setSyncStatus}
-            onRefresh={async () => setDocument((await readRecord()).document)}
-          />
-        </div>
-        <footer>
-          <span>EUR · Europe/Busingen</span>
-          {view !== 'settings' && (
-            <span className="sync-status" role="status">
-              {syncStatus}
-            </span>
+          {error && (
+            <div className="message error" role="alert">
+              {error}{' '}
+              <button
+                onClick={() => {
+                  if (
+                    !dirty ||
+                    window.confirm('Discard unsaved changes and reload?')
+                  )
+                    window.location.reload();
+                }}
+              >
+                Reload saved data
+              </button>
+            </div>
           )}
-        </footer>
-      </main>
-    </div>
+          {notice && (
+            <div className="message success" role="status">
+              {notice}
+            </div>
+          )}
+          {!document ? (
+            <section className="panel">
+              <h2>
+                {busy ? 'Opening household…' : 'Household data unavailable'}
+              </h2>
+            </section>
+          ) : (
+            <>
+              {view === 'overview' && (
+                <Overview
+                  document={document}
+                  month={month}
+                  disabled={busy || syncBusy}
+                  commit={commit}
+                  openPlan={() => changeView('plan')}
+                />
+              )}
+              {view === 'plan' && (
+                <MonthlyPlan
+                  key={month}
+                  document={document}
+                  month={month}
+                  disabled={busy || syncBusy}
+                  commit={commit}
+                  onDirty={setDirty}
+                />
+              )}
+              {view === 'settings' && (
+                <Settings
+                  document={document}
+                  disabled={busy || syncBusy}
+                  commit={commit}
+                  onDirty={setDirty}
+                />
+              )}
+            </>
+          )}
+          <div className="settings-pane" hidden={view !== 'settings'}>
+            <AppearancePanel {...appearance} />
+            <SyncPanel
+              dirty={dirty || busy}
+              refreshKey={refreshKey}
+              onBusy={setSyncBusy}
+              onStatus={setSyncStatus}
+              onRefresh={async () => setDocument((await readRecord()).document)}
+            />
+          </div>
+          <footer>
+            <span>EUR · Europe/Busingen</span>
+            {view !== 'settings' && (
+              <span className="sync-status" role="status">
+                {syncStatus}
+              </span>
+            )}
+          </footer>
+        </main>
+      </div>
+    </AppearanceContext.Provider>
   );
 }
 createRoot(document.getElementById('root')!).render(

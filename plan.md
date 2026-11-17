@@ -8,6 +8,12 @@
 - Only a member's explicit declaration adds that member's full operating/savings share to the month's confirmed funds. One immutable confirmation per member/month; no bank verification or separate member authentication is claimed. Later CSV/bank/PayPal matching may verify declarations. Corrections, partial confirmations/top-ups and actual spending entry remain future work.
 - The owner explicitly authorizes this product slice across the earlier milestone boundaries; it is awaiting review, not blanket acceptance of other features.
 
+## Branding and personal appearance
+
+Use the owner-supplied Multicolor JML logo for the header/favicon/PWA icons. Preserve the compact desktop/Android layouts while adopting its violet/pink/amber/cyan palette. Reference `afterglow-neon-pwa` for Electric halo (default), Liquid prism, Solar flare and Pixel rush, with a Solid fallback. Settings exposes theme, effect, palette, accent, operating/savings color stops, six category chart colors, glow, speed and motion controls with preview-only sample data.
+
+Appearance is personal to each device (`family-appearance-v1` in localStorage), with input validation, automatic persistence and a reset. It never changes household financial data or credentials. Real fund progress remains derived from confirmed transfers; no glow/fill is shown for unconfirmed zero funds. Reuse the bar component for future goals and charts. Respect system reduced motion and keep numeric labels independent of color.
+
 ## Current storage and synchronization — schema v2
 
 `household.json` is the authoritative private GitHub document for the entire household, replacing per-month draft synchronization below. It contains recurring schedules, effective-month savings targets, member names, immutable transfer confirmations and preserved legacy targets. IndexedDB `family-manager-v1` upgrades to version 2, adding a household store while leaving old budget rows intact. Old private monthly JSON is imported on first connection when no v2 household exists; old files are not deleted. Manual legacy operating targets do not invent recurring expenses or funds.

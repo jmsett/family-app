@@ -29,7 +29,12 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
     ).json(),
   );
   expect(manifest.display).toBe('standalone');
-  expect(manifest.icons).toHaveLength(2);
+  expect(manifest.icons).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ sizes: '192x192' }),
+      expect.objectContaining({ sizes: '512x512', purpose: 'maskable' }),
+    ]),
+  );
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
