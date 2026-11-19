@@ -12,7 +12,25 @@ async function purchase(
   preset = 'equal',
 ) {
   await page.getByRole('button', { name: 'Add expense', exact: true }).click();
-  await page.getByLabel('Expense quick setup').selectOption(preset);
+  const self = await page.getByLabel('Quick paid by').inputValue();
+  await page
+    .getByLabel('Quick paid by')
+    .selectOption(
+      preset === 'household'
+        ? 'household'
+        : preset.startsWith('other-')
+          ? self === 'a'
+            ? 'b'
+            : 'a'
+          : self,
+    );
+  await page
+    .getByLabel('Quick expense type')
+    .selectOption(
+      preset === 'household' || preset.endsWith('advance')
+        ? 'household'
+        : preset.replace('other-', ''),
+    );
   await page.getByLabel('Expense description').fill(description);
   await page.getByLabel('Expense amount', { exact: true }).fill(amount);
 }
@@ -71,7 +89,10 @@ test('expenses, partial repayments and corrections retain history and carry debt
   ).toContainText('Included the tip');
   await page.getByText('Filters', { exact: true }).click();
   await page.getByLabel('History party').selectOption('household');
+  await expect(page.getByTestId('actual-spending-total')).toHaveText('€100.00');
+  await page.getByLabel('Spending scope').selectOption('household');
   await expect(page.getByTestId('actual-spending-total')).toHaveText('€0.00');
+  await page.getByLabel('Spending scope').selectOption('total');
   await page.getByLabel('History party').selectOption('all');
   await page.screenshot({
     path: `test-results/${testInfo.project.name}-ledger.png`,
@@ -134,7 +155,7 @@ test('exact and percentage editors validate totals and work at narrow phone widt
   await purchase(page, 'Transport', '100.01');
   await page
     .getByRole('form', { name: 'Add expense', exact: true })
-    .getByText('Advanced options', { exact: true })
+    .getByRole('button', { name: 'Custom', exact: true })
     .click();
   await page.getByLabel('Split method').selectOption('amount');
   await page.getByLabel('Member A split amount', { exact: true }).fill('20');
@@ -148,7 +169,7 @@ test('exact and percentage editors validate totals and work at narrow phone widt
   await purchase(page, 'Tickets', '100.01');
   await page
     .getByRole('form', { name: 'Add expense', exact: true })
-    .getByText('Advanced options', { exact: true })
+    .getByRole('button', { name: 'Custom', exact: true })
     .click();
   await page.getByLabel('Split method').selectOption('percentage');
   await page
@@ -393,7 +414,7 @@ test('funds confirm independently, zero shares need no transfer, and savings mov
   await purchase(page, 'Paid from savings', '10', 'household');
   await page
     .getByRole('form', { name: 'Add expense', exact: true })
-    .getByText('Advanced options', { exact: true })
+    .getByRole('button', { name: 'Custom', exact: true })
     .click();
   await page
     .getByLabel('Expense fund', { exact: true })
@@ -510,4 +531,157 @@ test('confirmed funding toggles back to pending, preserves the other fund and ca
       exact: true,
     }),
   ).toHaveCount(0);
+});
+
+test('Quick and Custom are separate and category spending assigns costs to responsible people or Household', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+  await identity(page);
+  const entries = [
+    ['a', 'personal', '20', 'Food', 'A personal'],
+    ['b', 'personal', '30', 'Food', 'B personal'],
+    ['b', 'equal', '80', 'Entertainment', 'Shared dinner'],
+    ['a', 'full', '100', 'Food', 'A owed all'],
+    ['b', 'full', '40', 'Food', 'B owed all'],
+    ['a', 'household', '50', 'Home & bills', 'A household advance'],
+    ['b', 'household', '70', 'Home & bills', 'B household advance'],
+    ['household', 'household', '60', 'Home & bills', 'Household paid'],
+  ];
+  for (const [paidBy, kind, amount, category, description] of entries) {
+    await page
+      .getByRole('button', { name: 'Add expense', exact: true })
+      .click();
+    const form = page.getByRole('form', { name: 'Add expense', exact: true });
+    await expect(
+      form.getByRole('button', { name: 'Quick', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(form.getByLabel('Expense payer')).toHaveCount(0);
+    await expect(form.getByLabel('Split method')).toHaveCount(0);
+    await expect(
+      form
+        .getByRole('group', { name: 'Quick expense setup', exact: true })
+        .getByRole('combobox'),
+    ).toHaveCount(2);
+    await form.getByLabel('Quick paid by').selectOption(paidBy);
+    await form.getByLabel('Quick expense type').selectOption(kind);
+    await form.getByLabel('Expense description').fill(description);
+    await form.getByLabel('Expense amount', { exact: true }).fill(amount);
+    await form.getByLabel('Actual expense category').selectOption(category);
+    if (description === 'A owed all')
+      await page.screenshot({
+        path: `test-results/${testInfo.project.name}-quick-expense.png`,
+        fullPage: true,
+      });
+    await form
+      .getByRole('button', { name: 'Save expense', exact: true })
+      .click();
+    await expect(form).toHaveCount(0);
+  }
+  await page.getByText('Spending by category', { exact: true }).click();
+  const report = page.getByRole('region', {
+    name: 'Spending by category',
+    exact: true,
+  });
+  await expect(report.getByTestId('actual-spending-total')).toHaveText(
+    '€450.00',
+  );
+  for (const [scope, amount] of [
+    ['a', '€100.00'],
+    ['b', '€170.00'],
+    ['household', '€180.00'],
+    ['total', '€450.00'],
+  ]) {
+    await report.getByLabel('Spending scope').selectOption(scope);
+    await expect(report.getByTestId('actual-spending-total')).toHaveText(
+      amount,
+    );
+  }
+  await report.getByLabel('Spending scope').selectOption('household');
+  await expect(report.locator('figcaption')).toContainText(
+    'Home & bills100%€180.00',
+  );
+  await expect(report.locator('figcaption')).not.toContainText('Food');
+  await page
+    .getByText('Expenses & payment history (8)', { exact: true })
+    .click();
+  await page.getByText('Filters', { exact: true }).click();
+  await page.getByLabel('History party').selectOption('a');
+  await report.getByLabel('Spending scope').selectOption('total');
+  await expect(report.getByTestId('actual-spending-total')).toHaveText(
+    '€450.00',
+  );
+  await page.getByLabel('History category').selectOption('Entertainment');
+  await report.getByLabel('Spending scope').selectOption('a');
+  await expect(report.getByTestId('actual-spending-total')).toHaveText(
+    '€40.00',
+  );
+  await report.getByLabel('Spending scope').selectOption('household');
+  await expect(report.getByTestId('actual-spending-total')).toHaveText('€0.00');
+  await page.getByRole('button', { name: 'Add expense', exact: true }).click();
+  await page.getByLabel('Expense description').fill('Mode switch');
+  await page.getByLabel('Expense amount', { exact: true }).fill('12');
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
+  await expect(page.getByLabel('Quick paid by')).toHaveCount(0);
+  await expect(page.getByLabel('Quick expense type')).toHaveCount(0);
+  await expect(page.getByLabel('Expense payer')).toBeVisible();
+  await expect(page.getByLabel('Split method')).toBeVisible();
+  await expect(page.getByLabel('Expense description')).toHaveValue(
+    'Mode switch',
+  );
+  await page.getByRole('button', { name: 'Quick', exact: true }).click();
+  await expect(page.getByLabel('Expense payer')).toHaveCount(0);
+  await expect(page.getByLabel('Split method')).toHaveCount(0);
+  await expect(page.getByLabel('Expense amount', { exact: true })).toHaveValue(
+    '12',
+  );
+  await page.setViewportSize({ width: 320, height: 850 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test('correcting in Quick preserves the other payer and assigns the corrected full cost only to the debtor', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await identity(page);
+  await purchase(page, 'Other payer full cost', '40', 'other-full');
+  await page.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await expect(page.getByTestId('balance-a')).toHaveText('−€40.00');
+  await page
+    .getByText('Expenses & payment history (1)', { exact: true })
+    .click();
+  const row = page.getByRole('article', {
+    name: 'expense: Other payer full cost',
+    exact: true,
+  });
+  await row.getByText('Details', { exact: true }).click();
+  await row.getByRole('button', { name: 'Correct', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: 'Custom', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Quick', exact: true }).click();
+  await expect(page.getByLabel('Quick paid by')).toHaveValue('b');
+  await expect(page.getByLabel('Quick expense type')).toHaveValue('full');
+  await expect(page.getByLabel('Correction reason')).toBeVisible();
+  await page.getByLabel('Expense amount', { exact: true }).fill('60');
+  await page.getByLabel('Correction reason').fill('Corrected ticket price');
+  await page
+    .getByRole('button', { name: 'Save correction', exact: true })
+    .click();
+  await expect(page.getByTestId('balance-a')).toHaveText('−€60.00');
+  await page.getByText('Spending by category', { exact: true }).click();
+  for (const [scope, total] of [
+    ['total', '€60.00'],
+    ['a', '€60.00'],
+    ['b', '€0.00'],
+    ['household', '€0.00'],
+  ]) {
+    await page.getByLabel('Spending scope').selectOption(scope);
+    await expect(page.getByTestId('actual-spending-total')).toHaveText(total);
+  }
 });

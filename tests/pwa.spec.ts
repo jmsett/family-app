@@ -61,10 +61,23 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await page.reload();
   await expect(page.getByTestId('savings-funds')).toHaveText('€200.00');
   await page.getByRole('button', { name: 'Add expense', exact: true }).click();
+  await expect(page.getByLabel('Quick paid by')).toBeVisible();
+  await expect(page.getByLabel('Quick expense type')).toBeVisible();
+  await expect(page.getByLabel('Split method')).toHaveCount(0);
   await page.getByLabel('Expense description').fill('Offline purchase');
   await page.getByLabel('Expense amount', { exact: true }).fill('20');
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
   await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
+  await page.getByText('Spending by category', { exact: true }).click();
+  for (const [scope, total] of [
+    ['a', '€10.00'],
+    ['b', '€10.00'],
+    ['household', '€0.00'],
+    ['total', '€20.00'],
+  ]) {
+    await page.getByLabel('Spending scope').selectOption(scope);
+    await expect(page.getByTestId('actual-spending-total')).toHaveText(total);
+  }
   await page.reload();
   await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
   await page.getByText('Fund activity', { exact: true }).click();
@@ -367,6 +380,17 @@ test('devices synchronize plans, recover conflicts and merge independent offline
     await expect(device.getByTestId('actual-spending-total')).toHaveText(
       '€30.00',
     );
+    for (const [scope, total] of [
+      ['a', '€15.00'],
+      ['b', '€15.00'],
+      ['household', '€0.00'],
+      ['total', '€30.00'],
+    ]) {
+      await device.getByLabel('Spending scope').selectOption(scope);
+      await expect(device.getByTestId('actual-spending-total')).toHaveText(
+        total,
+      );
+    }
   }
   await context.setOffline(true);
   await expect(

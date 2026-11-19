@@ -364,3 +364,93 @@ it('upgrades schema3 without changing any posted expense or its personal balance
   expect(doc.ledger).toEqual([original]);
   expect(netBalances(doc.ledger)).toEqual({ a: 4000, b: -4000, household: 0 });
 });
+
+describe('category spending by responsibility', () => {
+  it('separates total, household and personal shares regardless of who paid', () => {
+    const entries = [
+      { ...expense('own-a', 1000, 'a', [1, 0, 0]), category: 'Food' },
+      { ...expense('own-b', 2000, 'b', [0, 1, 0]), category: 'Transport' },
+      { ...expense('split', 8000, 'b', [1, 1, 0]), category: 'Entertainment' },
+      { ...expense('a-owed-full', 6000, 'a', [0, 1, 0]), category: 'Food' },
+      { ...expense('b-owed-full', 7000, 'b', [1, 0, 0]), category: 'Food' },
+      { ...expense('advance', 9000, 'a', [0, 0, 1]), category: 'Home' },
+      {
+        ...expense('household-purchase', 3000, 'household', [0, 0, 1]),
+        category: 'Home',
+      },
+      {
+        ...expense('household-for-a', 5000, 'household', [1, 0, 0]),
+        category: 'Health',
+      },
+    ];
+    const doc = { ...initialHousehold(), ledger: entries };
+    const report = (scope: 'total' | 'a' | 'b' | 'household') =>
+      categorySpending(doc, '2026-11-01', '2026-11-30', scope);
+    const sum = (scope: 'total' | 'a' | 'b' | 'household') =>
+      report(scope).reduce((n, r) => n + r.amountMinor, 0);
+    expect(sum('total')).toBe(41000);
+    expect(sum('a')).toBe(17000);
+    expect(sum('b')).toBe(12000);
+    expect(sum('household')).toBe(12000);
+    expect(sum('a') + sum('b') + sum('household')).toBe(sum('total'));
+    expect(
+      Object.fromEntries(report('a').map((r) => [r.category, r.amountMinor])),
+    ).toEqual({ Food: 8000, Health: 5000, Entertainment: 4000 });
+    expect(report('household')).toEqual([
+      { category: 'Home', amountMinor: 12000 },
+    ]);
+    expect(categorySpending(doc, '2026-11-01', '2026-11-30')).toEqual(
+      report('total'),
+    );
+  });
+  it('conserves odd cents and includes only each party’s portion of a mixed custom split', () => {
+    const doc = {
+      ...initialHousehold(),
+      ledger: [
+        expense('odd', 101, 'b', [1, 1, 0]),
+        expense('mixed', 101, 'a', [1, 1, 1]),
+      ],
+    };
+    const sum = (scope: 'total' | 'a' | 'b' | 'household') =>
+      categorySpending(doc, '2026-11-01', '2026-11-30', scope).reduce(
+        (n, r) => n + r.amountMinor,
+        0,
+      );
+    expect(sum('total')).toBe(202);
+    expect(sum('a')).toBe(83);
+    expect(sum('b')).toBe(85);
+    expect(sum('household')).toBe(34);
+    expect(sum('a') + sum('b') + sum('household')).toBe(sum('total'));
+  });
+  it('respects dates, excludes zero shares and cancels reversed spending in every scope', () => {
+    const original = expense('reversed', 8000, 'a', [1, 1, 0]);
+    const reversal: LedgerReversal = {
+      id: 'undo',
+      kind: 'reversal',
+      targetId: original.id,
+      date,
+      createdAt,
+      actor: 'a',
+      reason: 'Incorrect amount',
+    };
+    const doc = {
+      ...initialHousehold(),
+      ledger: [
+        original,
+        reversal,
+        expense('replacement', 10000, 'a', [0, 1, 0]),
+        payment('pay', 'b', 'a', 10000),
+      ],
+    };
+    expect(categorySpending(doc, '2026-11-01', '2026-11-30', 'a')).toEqual([]);
+    expect(
+      categorySpending(doc, '2026-11-01', '2026-11-30', 'household'),
+    ).toEqual([]);
+    expect(categorySpending(doc, '2026-11-01', '2026-11-30', 'b')).toEqual([
+      { category: 'Food', amountMinor: 10000 },
+    ]);
+    expect(categorySpending(doc, '2026-12-01', '2026-12-31', 'total')).toEqual(
+      [],
+    );
+  });
+});

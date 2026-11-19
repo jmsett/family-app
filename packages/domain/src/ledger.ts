@@ -418,14 +418,28 @@ export function memberImpact(
     );
   return 0;
 }
-export function categorySpending(doc: HouseholdPlan, from: string, to: string) {
+export type SpendingScope = 'total' | Party;
+export function categorySpending(
+  doc: HouseholdPlan,
+  from: string,
+  to: string,
+  scope: SpendingScope = 'total',
+) {
+  if (!['total', ...PARTIES].includes(scope))
+    throw new Error('Choose a valid spending scope.');
   const totals = new Map<string, number>();
   for (const event of activeEntries(doc.ledger))
-    if (event.kind === 'expense' && event.date >= from && event.date <= to)
-      totals.set(
-        event.category,
-        (totals.get(event.category) ?? 0) + event.amountMinor,
-      );
+    if (event.kind === 'expense' && event.date >= from && event.date <= to) {
+      const amountMinor =
+        scope === 'total'
+          ? event.amountMinor
+          : event.shares[PARTIES.indexOf(scope)];
+      if (amountMinor > 0)
+        totals.set(
+          event.category,
+          (totals.get(event.category) ?? 0) + amountMinor,
+        );
+    }
   return [...totals]
     .map(([category, amountMinor]) => ({ category, amountMinor }))
     .sort(

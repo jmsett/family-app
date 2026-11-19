@@ -267,7 +267,7 @@ test('recurring edits apply forward or across all months and deleting removes pl
     .getByLabel('Expense description', { exact: true })
     .fill('Recorded rent payment');
   await page.getByLabel('Expense amount', { exact: true }).fill('80');
-  await page.locator('form .advanced-options > summary').click();
+  await page.getByRole('button', { name: 'Custom', exact: true }).click();
   await page.getByLabel('Expense date', { exact: true }).fill('2020-01-03');
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
   await expect(page.getByTestId('balance-a')).toHaveText('+€40.00');

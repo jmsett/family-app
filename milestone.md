@@ -1,6 +1,16 @@
 # Milestones and owner review gates
 
-## Recurring corrections and deletion — current review slice
+## Expense entry modes and spending ownership — current review slice
+
+**Status: implemented; local verification passed, owner review pending.** Owner requested separate Quick/Custom flows and Total/Household/member category views based on who bears the cost.
+
+- Quick uses Who paid and Personal/50/50/Owed full amount/Paid for household. Custom alone shows date/account/split controls. Shared metadata remains entered, recording the other member stays supported, and correction reasons work in either mode.
+- Category views sum captured beneficiary shares: halves to members, fully owed amounts to the debtor, household costs only to Household, and all costs to Total. Payer/source do not determine classification. Shared date/category/label filters remain; history involvement is independent.
+- Schema 9 and financial history stay unchanged. Verification passed: type checking, lint, build, formatting, 111 unit/API/domain/sync tests, 52 desktop/Android workflows and eight production PWA cases. Coverage includes responsibility conservation/odd cents, corrections/exclusions, both payer perspectives, mode separation, narrow layouts and offline/two-device reporting. Actual phone and private-repository use remain owner review.
+
+Try: Overview → Add expense → Quick; choose payer and type. Expand Spending by category and compare Total, Household and each member. Use Custom for account or detailed split changes.
+
+## Recurring corrections and deletion — earlier review slice
 
 **Status: implemented; local verification passed, owner review pending.** Owner requested edit scopes from the selected month onward or across all history, and full deletion of recurring planning history.
 
