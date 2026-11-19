@@ -1,5 +1,15 @@
 # Foundation decisions and API contract
 
+## ADR 021: Editable recurring planning with scoped corrections and full deletion
+
+Owner explicitly authorized removing historical recurring planning data, while actual financial postings remain separate. Schema 9 adds `expenseChanges`, keyed by recurring expense ID and effective month. Each complete snapshot captures name, amount, due day, end date, category and labels. The original schedule retains its first-payment anchor and archive boundary. Select the latest applicable snapshot for each monthly plan; keep clamping due days and inclusive end dates. Historical chart goals already derive monthly plans and therefore reflect scoped corrections without altering cash flows.
+
+Forward edits replace snapshots from the selected month onward, retaining earlier ones. All-history edits replace the timeline from the first payment month. The editor states the scope and that later scheduled changes will be replaced. Archived schedules stay archived. Delete removes the schedule and all snapshots from the current document and derived historical budgets; a prompt distinguishes it from archive and from immutable transfers/actual ledger entries. Git history and previous backups are outside this deletion. All operations stage in Monthly plan until its atomic save.
+
+Validate change references, unique schedule/month pairs, positive integer-cent amounts, due days 1–31, metadata and original-date/end constraints. Include every effective change month in aggregate-limit validation. Group snapshots once per monthly projection to avoid repeated scans per schedule. Canonical serialization and decoding normalize change fields, and existing three-way plan conflicts cover edits/deletions. A stale financial-only device adopts the remote deletion while retaining immutable financial events; competing plan edits require review. Schemas 2–8 migrate to empty change history with no fabricated corrections, altered financial records or credential changes.
+
+Verification covers scope/version replacement, month-end/end/archive boundaries, aggregate limits, historical charts, deletion retaining cash/ledger, malformed references/migration, stale-device sync, phone/desktop edit/delete forms and production offline/two-device workflows.
+
 ## ADR 020: Planned lump-sum trip costs alongside contingency
 
 Owner requested an additional total for tours and other planned expenses. Schema 8 adds required integer-cent `TripGoal.otherMinor`; schema-7 trips migrate with zero to preserve previous budgets, allocations, labels and photos. Earlier migrations chain through that upgrade. Canonical serialization, decoding and sync include the field; old clients reject the newer schema rather than drop the planned amount.

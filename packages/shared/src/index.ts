@@ -34,6 +34,16 @@ export interface RecurringExpense {
   category: string;
   labels: string[];
 }
+export interface RecurringExpenseChange {
+  expenseId: string;
+  month: string;
+  name: string;
+  amountMinor: number;
+  dueDay: number;
+  endDate: string | null;
+  category: string;
+  labels: string[];
+}
 export type Fund = 'operating' | 'savings';
 export interface TransferConfirmation {
   id: string;
@@ -51,10 +61,11 @@ export interface FundingRetraction {
   retractedAt: string;
 }
 export interface HouseholdPlan {
-  schemaVersion: 8;
+  schemaVersion: 9;
   revision: number;
   memberNames: [string, string];
   expenses: RecurringExpense[];
+  expenseChanges: RecurringExpenseChange[];
   savingsTargets: { month: string; amountMinor: number }[];
   incomes: { month: string; amountsMinor: [number, number] }[];
   fundingRules: FundingRule[];

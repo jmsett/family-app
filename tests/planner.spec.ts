@@ -242,3 +242,194 @@ test('appearance persists across reopening, updates real bar colors and respects
     'halo',
   );
 });
+
+test('recurring edits apply forward or across all months and deleting removes planning history without removing recorded money', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await navigate(page, 'Monthly plan');
+  await page.getByLabel('Planning month').fill('2030-01');
+  await page
+    .getByRole('button', { name: 'Add recurring expense', exact: true })
+    .click();
+  await page.getByLabel('Expense name', { exact: true }).fill('Rent');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('100');
+  await page.getByLabel('First due date', { exact: true }).fill('2030-01-31');
+  await page.getByRole('button', { name: 'Add to plan', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await confirm(page, '0');
+  await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
+  await page.getByRole('button', { name: 'Add expense', exact: true }).click();
+  await page
+    .getByLabel('Expense description', { exact: true })
+    .fill('Recorded rent payment');
+  await page.getByLabel('Expense amount', { exact: true }).fill('80');
+  await page.locator('form .advanced-options > summary').click();
+  await page.getByLabel('Expense date', { exact: true }).fill('2020-01-03');
+  await page.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await expect(page.getByTestId('balance-a')).toHaveText('+€40.00');
+  await navigate(page, 'Monthly plan');
+  await page.getByLabel('Planning month').fill('2030-03');
+  let row = page.locator('.expense-row').filter({ hasText: 'Rent' });
+  await row.getByText('Manage', { exact: true }).click();
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page.getByLabel('Recurring edit scope')).toHaveValue('forward');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('120');
+  await page.getByLabel('Recurring due day', { exact: true }).fill('31');
+  await page
+    .getByLabel('Payment duration', { exact: true })
+    .selectOption('limited');
+  await page
+    .getByLabel('Last payment date', { exact: true })
+    .fill('2030-04-30');
+  await page
+    .getByRole('button', { name: 'Apply edit to plan', exact: true })
+    .click();
+  await expect(page.getByTestId('operating-target')).toHaveText('€120.00');
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  for (const [month, amount] of [
+    ['2030-01', '€100.00'],
+    ['2030-02', '€100.00'],
+    ['2030-03', '€120.00'],
+    ['2030-04', '€120.00'],
+    ['2030-05', '€0.00'],
+  ]) {
+    await page.getByLabel('Planning month').fill(month);
+    await expect(page.getByTestId('operating-target')).toHaveText(amount);
+  }
+  await page.getByLabel('Planning month').fill('2030-03');
+  row = page.locator('.expense-row').filter({ hasText: 'Rent' });
+  await row.getByText('Manage', { exact: true }).click();
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Recurring edit scope').selectOption('all');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('90');
+  await page
+    .getByLabel('Payment duration', { exact: true })
+    .selectOption('indefinite');
+  await page
+    .getByRole('button', { name: 'Apply edit to plan', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await page.reload();
+  await navigate(page, 'Monthly plan');
+  for (const month of ['2030-01', '2030-02', '2030-04', '2030-07']) {
+    await page.getByLabel('Planning month').fill(month);
+    await expect(page.getByTestId('operating-target')).toHaveText('€90.00');
+  }
+  row = page.locator('.expense-row').filter({ hasText: 'Rent' });
+  await row.getByText('Manage', { exact: true }).click();
+  page.once('dialog', (d) => d.dismiss());
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByTestId('operating-target')).toHaveText('€90.00');
+  page.once('dialog', (d) => {
+    expect(d.message()).toContain('from all months');
+    void d.accept();
+  });
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.getByTestId('operating-target')).toHaveText('€0.00');
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  for (const month of ['2030-01', '2030-03', '2030-07']) {
+    await page.getByLabel('Planning month').fill(month);
+    await expect(page.getByTestId('operating-target')).toHaveText('€0.00');
+  }
+  await page.getByLabel('Planning month').fill('2030-01');
+  await navigate(page, 'Overview');
+  await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
+  await expect(page.getByTestId('balance-a')).toHaveText('+€40.00');
+  await page.locator('.ledger-history > details > summary').click();
+  await page.locator('.history-filter-options > summary').click();
+  await page.getByLabel('History from date').fill('2020-01-01');
+  await expect(
+    page.locator('.activity-row').filter({ hasText: 'Recorded rent payment' }),
+  ).toBeVisible();
+});
+
+test('archived recurring expenses can be corrected or deleted, and an unfinished edit protects the monthly plan', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/');
+  await navigate(page, 'Monthly plan');
+  await page.getByLabel('Planning month').fill('2030-01');
+  await page
+    .getByRole('button', { name: 'Add recurring expense', exact: true })
+    .click();
+  await page.getByLabel('Expense name', { exact: true }).fill('Subscription');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('50');
+  await page.getByRole('button', { name: 'Add to plan', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await page.getByLabel('Planning month').fill('2030-02');
+  let row = page.locator('.expense-row').filter({ hasText: 'Subscription' });
+  await row.getByText('Manage', { exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await row.getByRole('button', { name: 'Archive', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await page.locator('.schedule-history > summary').click();
+  row = page.locator('.expense-row').filter({ hasText: 'Subscription' });
+  await row.getByText('Manage', { exact: true }).click();
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Recurring edit scope').selectOption('all');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('0');
+  await page
+    .getByRole('button', { name: 'Apply edit to plan', exact: true })
+    .click();
+  await expect(page.getByRole('alert')).toContainText('greater than zero');
+  await expect(
+    page.getByRole('button', { name: 'Save monthly plan', exact: true }),
+  ).toBeDisabled();
+  page.once('dialog', (d) => d.dismiss());
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect(
+    page.getByRole('form', { name: 'Edit recurring expense', exact: true }),
+  ).toBeVisible();
+  await page.getByLabel('Monthly amount', { exact: true }).fill('40');
+  await page.setViewportSize({ width: 320, height: 850 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `test-results/${testInfo.project.name}-recurring-editor.png`,
+    fullPage: true,
+  });
+  await page
+    .getByRole('button', { name: 'Apply edit to plan', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await expect(page.getByTestId('operating-target')).toHaveText('€0.00');
+  await page.getByLabel('Planning month').fill('2030-01');
+  await expect(page.getByTestId('operating-target')).toHaveText('€40.00');
+  await page.getByLabel('Planning month').fill('2030-02');
+  await page.locator('.schedule-history > summary').click();
+  row = page.locator('.expense-row').filter({ hasText: 'Subscription' });
+  await row.getByText('Manage', { exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await row.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await page.getByLabel('Planning month').fill('2030-01');
+  await expect(page.getByTestId('operating-target')).toHaveText('€0.00');
+});

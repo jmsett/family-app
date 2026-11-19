@@ -10,6 +10,8 @@ import {
   parsePercentage,
   EXPENSE_CATEGORIES,
   monthlyPlan,
+  recurringExpenseFor,
+  deleteRecurringExpense,
   parseMoney,
   recordedFunds,
   savingsFor,
@@ -19,6 +21,7 @@ import {
 import type { Fund, HouseholdPlan, RecurringExpense } from '@family/shared';
 import { readRecord, saveHousehold } from './storage';
 import { FundActivity } from './FundActivity';
+import { RecurringExpenseEditor } from './RecurringExpenseEditor';
 import { LedgerPanel } from './LedgerPanel';
 import { SyncPanel } from './SyncPanel';
 import { useAppearance } from './appearance';
@@ -81,6 +84,7 @@ function MonthlyPlan({
     ].map((n) => String(n / 100)),
   );
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const emptyExpense = () => ({
     name: '',
     amount: '',
@@ -157,13 +161,14 @@ function MonthlyPlan({
   const dirty =
     canonicalHousehold(candidate) !== canonicalHousehold(document) ||
     !!validation ||
-    expenseTouched;
+    expenseTouched ||
+    editingId !== null;
   useEffect(() => onDirty(dirty), [dirty, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
   const plan = monthlyPlan(candidate, month);
-  const other = draft.expenses.filter(
-    (e) => !plan.expenses.some((active) => active.id === e.id),
-  );
+  const other = draft.expenses
+    .filter((e) => !plan.expenses.some((active) => active.id === e.id))
+    .map((e) => recurringExpenseFor(draft, e.id, month));
   function addExpense(event: React.FormEvent) {
     event.preventDefault();
     setExpenseError('');
@@ -229,16 +234,47 @@ function MonthlyPlan({
       </div>
       <div className="expense-actions">
         <strong>{money(entry.amountMinor)}</strong>
-        {!entry.archivedFromMonth && (
-          <button
-            className="text-button"
-            type="button"
-            disabled={disabled}
-            onClick={() => archive(entry)}
-          >
-            Archive
-          </button>
-        )}
+        <details className="recurring-manage">
+          <summary>Manage</summary>
+          <div>
+            <button
+              className="text-button"
+              type="button"
+              disabled={disabled || adding || editingId !== null}
+              onClick={() => {
+                setExpenseError('');
+                setEditingId(entry.id);
+              }}
+            >
+              Edit
+            </button>
+            {!entry.archivedFromMonth && (
+              <button
+                className="text-button"
+                type="button"
+                disabled={disabled || adding || editingId !== null}
+                onClick={() => archive(entry)}
+              >
+                Archive
+              </button>
+            )}
+            <button
+              className="text-button destructive"
+              type="button"
+              disabled={disabled || adding || editingId !== null}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Delete ${entry.name} from all months, including its recurring planning history? Recorded expenses and confirmed transfers remain. Save monthly plan to apply the deletion.`,
+                  )
+                )
+                  setDraft(deleteRecurringExpense(draft, entry.id));
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </details>
       </div>
     </article>
   );
@@ -260,7 +296,20 @@ function MonthlyPlan({
               fixed monthly costs.
             </p>
           )}
-          {!adding ? (
+          {editingId ? (
+            <RecurringExpenseEditor
+              key={editingId}
+              document={draft}
+              id={editingId}
+              month={month}
+              disabled={disabled}
+              apply={(next) => {
+                setDraft(next);
+                setEditingId(null);
+              }}
+              cancel={() => setEditingId(null)}
+            />
+          ) : !adding ? (
             <button
               className="secondary"
               type="button"
@@ -328,6 +377,7 @@ function MonthlyPlan({
                     ...new Set([
                       ...EXPENSE_CATEGORIES,
                       ...draft.expenses.map((entry) => entry.category),
+                      ...draft.expenseChanges.map((c) => c.category),
                     ]),
                   ].map((category) => (
                     <option key={category} value={category}>
@@ -576,16 +626,30 @@ function MonthlyPlan({
             </p>
           )}
           <div className="form-footer">
-            <small>Targets are plans, not transferred funds.</small>
+            <small>
+              Save to apply plan edits, archives and deletions. Targets are
+              plans, not transferred funds.
+            </small>
             <button
               type="button"
               className="primary"
-              disabled={disabled || !dirty || !!validation || expenseTouched}
+              disabled={
+                disabled ||
+                !dirty ||
+                !!validation ||
+                expenseTouched ||
+                editingId !== null
+              }
               onClick={() => void commit(candidate)}
             >
               Save monthly plan
             </button>
           </div>
+          {editingId !== null && (
+            <p className="muted">
+              Apply or cancel the recurring expense edit before saving.
+            </p>
+          )}
           {expenseTouched && (
             <p className="muted">
               Add the expense to your plan or cancel it before saving.

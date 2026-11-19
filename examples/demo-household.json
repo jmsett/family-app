@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "revision": 0,
   "memberNames": ["Alex (sample)", "Sam (sample)"],
   "expenses": [
@@ -54,6 +54,7 @@
       "labels": ["sample", "monthly"]
     }
   ],
+  "expenseChanges": [],
   "savingsTargets": [
     { "month": "2025-01", "amountMinor": 80000 },
     { "month": "2026-01", "amountMinor": 100000 }

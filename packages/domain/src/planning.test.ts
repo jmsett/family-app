@@ -218,7 +218,7 @@ describe('independent fund confirmations and legacy upgrades', () => {
       ],
     };
     const migrated = upgradeHousehold(old);
-    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.schemaVersion).toBe(9);
     expect(migrated.transfers.map((t) => [t.fund, t.amountMinor])).toEqual([
       ['operating', 40000],
       ['savings', 10000],
@@ -407,5 +407,224 @@ describe('retractable funding confirmations', () => {
       })),
     };
     expect(upgradeHousehold(legacy)).toEqual(current);
+  });
+});
+
+describe('recurring expense corrections and deletion', () => {
+  const fields = {
+    name: 'Corrected rent',
+    amountMinor: 90000,
+    dueDay: 15,
+    endDate: null,
+    category: 'Home & bills',
+    labels: ['corrected'],
+  };
+  it('applies a forward edit to that month and future targets without rewriting earlier plans or captured funding', async () => {
+    const { editRecurringExpense, buildHistory } = await import('./index');
+    const original = confirmTransfer(
+      household(),
+      '2030-01',
+      0,
+      '2030-01-02T12:00:00Z',
+    );
+    const edited = editRecurringExpense(
+      original,
+      'rent',
+      '2030-03',
+      fields,
+      'forward',
+    );
+    expect(monthlyPlan(edited, '2030-02').operatingMinor).toBe(80001);
+    expect(monthlyPlan(edited, '2030-03').operatingMinor).toBe(90000);
+    expect(monthlyPlan(edited, '2030-04').expenses[0]).toMatchObject({
+      name: 'Corrected rent',
+      due: '2030-04-15',
+      labels: ['corrected'],
+    });
+    expect(edited.transfers).toEqual(original.transfers);
+    expect(
+      buildHistory(edited, {
+        metric: 'operating',
+        interval: 'month',
+        from: '2030-01-01',
+        to: '2030-04-30',
+      }).map((p) => p.targetMinor),
+    ).toEqual([80001, 80001, 90000, 90000]);
+  });
+  it('replaces later scheduled changes and lets a retroactive correction replace the full schedule timeline', async () => {
+    const { editRecurringExpense } = await import('./index');
+    let doc = editRecurringExpense(
+      household(),
+      'rent',
+      '2030-02',
+      fields,
+      'forward',
+    );
+    doc = editRecurringExpense(
+      doc,
+      'rent',
+      '2030-06',
+      { ...fields, amountMinor: 110000 },
+      'forward',
+    );
+    doc = editRecurringExpense(
+      doc,
+      'rent',
+      '2030-04',
+      { ...fields, amountMinor: 95000 },
+      'forward',
+    );
+    expect(doc.expenseChanges.map((c) => c.month)).toEqual([
+      '2030-02',
+      '2030-04',
+    ]);
+    expect(monthlyPlan(doc, '2030-06').operatingMinor).toBe(95000);
+    doc = editRecurringExpense(
+      doc,
+      'rent',
+      '2030-04',
+      { ...fields, amountMinor: 70000 },
+      'all',
+    );
+    expect(doc.expenseChanges).toHaveLength(1);
+    expect(doc.expenseChanges[0].month).toBe('2030-01');
+    for (const month of ['2030-01', '2030-03', '2030-07'])
+      expect(monthlyPlan(doc, month).operatingMinor).toBe(70000);
+    expect(monthlyPlan(doc, '2029-12').operatingMinor).toBe(0);
+  });
+  it('retains clamped due days, inclusive end dates and archive boundaries when editing', async () => {
+    const { editRecurringExpense } = await import('./index');
+    let doc = editRecurringExpense(
+      household(),
+      'rent',
+      '2030-02',
+      { ...fields, dueDay: 31, endDate: '2030-04-30' },
+      'forward',
+    );
+    expect(monthlyPlan(doc, '2030-02').expenses[0].due).toBe('2030-02-28');
+    expect(monthlyPlan(doc, '2030-03').expenses[0].due).toBe('2030-03-31');
+    expect(monthlyPlan(doc, '2030-04').operatingMinor).toBe(90000);
+    expect(monthlyPlan(doc, '2030-05').operatingMinor).toBe(0);
+    doc = {
+      ...doc,
+      expenses: doc.expenses.map((e) => ({
+        ...e,
+        archivedFromMonth: '2030-03',
+      })),
+    };
+    doc = editRecurringExpense(doc, 'rent', '2030-03', fields, 'all');
+    expect(monthlyPlan(doc, '2030-02').operatingMinor).toBe(90000);
+    expect(monthlyPlan(doc, '2030-03').operatingMinor).toBe(0);
+  });
+  it('deletes all versions and their planning history while retaining other schedules, funding and actual ledger records', async () => {
+    const {
+      editRecurringExpense,
+      deleteRecurringExpense,
+      recordedFunds,
+      appendEntries,
+      buildHistory,
+    } = await import('./index');
+    let doc = confirmTransfer(
+      household(),
+      '2030-01',
+      0,
+      '2030-01-02T12:00:00Z',
+    );
+    doc = {
+      ...doc,
+      expenses: [
+        ...doc.expenses,
+        { ...expense, id: 'internet', name: 'Internet', amountMinor: 3000 },
+      ],
+    };
+    doc = editRecurringExpense(doc, 'rent', '2030-03', fields, 'forward');
+    doc = appendEntries(doc, [
+      {
+        id: '00000000-0000-4000-8000-000000000077',
+        kind: 'expense',
+        date: '2030-01-03',
+        createdAt: '2030-01-03T12:00:00Z',
+        actor: 'a',
+        description: 'Recorded rent',
+        amountMinor: 10000,
+        payer: 'a',
+        source: 'personal',
+        splitMode: 'equal',
+        splitInput: [1, 1, 0],
+        shares: [5000, 5000, 0],
+        category: 'Home',
+        labels: [],
+      },
+    ]);
+    const deleted = deleteRecurringExpense(doc, 'rent');
+    expect(deleted.expenses.map((e) => e.id)).toEqual(['internet']);
+    expect(deleted.expenseChanges).toEqual([]);
+    expect(deleted.ledger).toEqual(doc.ledger);
+    expect(deleted.transfers).toEqual(doc.transfers);
+    expect(recordedFunds(deleted, '2030-03')).toEqual(
+      recordedFunds(doc, '2030-03'),
+    );
+    expect(
+      buildHistory(deleted, {
+        metric: 'operating',
+        interval: 'month',
+        from: '2030-01-01',
+        to: '2030-04-30',
+      }).map((p) => p.targetMinor),
+    ).toEqual([3000, 3000, 3000, 3000]);
+  });
+  it('rejects invalid correction dates, values, orphaned and duplicate revisions and aggregate overflow', async () => {
+    const { editRecurringExpense } = await import('./index');
+    expect(() =>
+      editRecurringExpense(household(), 'rent', '2029-12', fields, 'forward'),
+    ).toThrow('on or after');
+    for (const bad of [
+      { amountMinor: 0 },
+      { amountMinor: -1 },
+      { dueDay: 32 },
+      { dueDay: 1.5 },
+      { endDate: '2029-12-31' },
+      { name: '' },
+    ])
+      expect(() =>
+        editRecurringExpense(
+          household(),
+          'rent',
+          '2030-02',
+          { ...fields, ...bad },
+          'forward',
+        ),
+      ).toThrow();
+    const edited = editRecurringExpense(
+      household(),
+      'rent',
+      '2030-02',
+      fields,
+      'forward',
+    );
+    expect(() => validateHousehold({ ...edited, expenses: [] })).toThrow(
+      'orphaned',
+    );
+    expect(() =>
+      validateHousehold({
+        ...edited,
+        expenseChanges: [...edited.expenseChanges, ...edited.expenseChanges],
+      }),
+    ).toThrow('duplicate');
+    expect(() =>
+      editRecurringExpense(
+        household(),
+        'rent',
+        '2030-02',
+        { ...fields, amountMinor: 100000000 },
+        'forward',
+      ),
+    ).toThrow('Amounts');
+  });
+  it('upgrades schema8 without inventing changes or altering existing records', async () => {
+    const { upgradeHousehold } = await import('./index');
+    const current = household();
+    const old = { ...current, schemaVersion: 8, expenseChanges: undefined };
+    expect(upgradeHousehold(old)).toEqual(current);
   });
 });

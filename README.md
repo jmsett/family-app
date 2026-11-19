@@ -16,6 +16,21 @@ Monthly due dates repeat on the original day, clamped to the last day in shorter
 
 Operating and savings transfers are confirmed independently for each member/month using the checkmarks on each fund card. Grey means pending; cyan means confirmed. A zero responsibility is marked complete as “not required”, without adding a financial record or money. Tap your cyan checkmark again to retract a mistaken confirmation after accepting the prompt. It returns to grey and the recorded contribution is removed from fund totals and historical charts; the other fund and member are unaffected. You can confirm it again when the transfer is made. **Fund activity** retains the original amount and marks it Retracted. Duplicate active confirmations are blocked, and later plan edits never change captured amounts. Reconfirming captures the current displayed share. Partial contributions, top-ups and CSV/bank/PayPal verification remain future work; confirm only after the full displayed transfer has been made.
 
+## Correcting or deleting recurring expenses
+
+In **Monthly plan**, open an expense’s **Manage** menu to **Edit**, **Archive** or **Delete**. Edits and deletions are staged with the rest of the plan: press **Save monthly plan** to apply them. An unfinished edit protects navigation and blocks saving/sync until you apply or cancel it.
+
+**Edit → Apply changes** offers:
+
+- **From the selected month onward:** keep earlier months unchanged and replace scheduled changes from that month forward.
+- **All months from first defined:** correct every month from the schedule’s first payment month, replacing its existing versions.
+
+Edit the name, monthly amount, due day, category, labels and final payment date. Days 29–31 still clamp to month end. The original start month and archive boundary remain; editing an archived schedule corrects its history without reactivating it. Historical fixed-budget targets and charts use the version applicable to each month. Income-percentage targets retain their separate rule.
+
+**Archive** stops future planning from the selected month and keeps earlier months. **Delete** removes the schedule and all its versions from every month, including historical recurring budgets, after an explicit prompt. Separately recorded expenses, repayments and confirmed funding remain intact. Git history and existing exports/backups may still contain older copies; Delete is not a repository-history purge.
+
+Versioned corrections and deletions synchronize as plan changes. Stale devices with only new financial entries adopt the deleted plan while retaining those entries; competing plan edits stop for review rather than silently restoring a deleted schedule. Schema 9 upgrades earlier data with an empty recurring-change history, preserving existing budgets and credentials.
+
 ## Income, funding rules and investments
 
 In **Settings → Household members**, enter each person's regular net monthly income and the month it starts. Income carries forward until changed; earlier months remain available. **Investments** (bank/building icon) shows each member’s and the household’s annual net income estimate: the selected month’s income × 12. Bonuses, extra salary payments and actual trailing-year earnings are not inferred.
@@ -83,11 +98,11 @@ Preferences save automatically on each device and are separate from household JS
 Following the existing `nunz-app` approach:
 
 - **family-app (public):** React/TypeScript source and static PWA hosted on GitHub Pages. No household records or credentials in source or deployment artifacts.
-- **family-data (private):** A schema-v8 household document at `household.json` containing recurring schedules, effective savings targets, monthly income history, funding rules, travel goals/earmarks/photos, transfer confirmations and their retractions, immutable expense/repayment/fund-movement/reversal events and preserved earlier drafts, synchronized through GitHub's Contents API. No production API server, SQLite database or VPN is needed.
+- **family-data (private):** A schema-v9 household document at `household.json` containing recurring schedules and effective-month corrections, effective savings targets, monthly income history, funding rules, travel goals/earmarks/photos, transfer confirmations and their retractions, immutable expense/repayment/fund-movement/reversal events and preserved earlier drafts, synchronized through GitHub's Contents API. No production API server, SQLite database or VPN is needed.
 - **Devices:** IndexedDB saves work offline. Each device uses a separate expiring fine-grained token scoped only to `family-data` with Contents read/write. Enter it only in the PWA. After checking private-repository access, the app saves the token in a separate device-only IndexedDB database and reconnects automatically when reopened. Disconnect removes the saved token. Tokens are never exported or synchronized.
 - **Conflicts:** independent member confirmations and retractions merge by stable IDs, without double counting or restoring a retracted transfer from an older device. Concurrent divergent plan edits require review. Independent expense and repayment events merge by immutable ID. Remote recovery can replace unsynced plan settings, but retains device financial history; conflicting amounts for the same confirmation are blocked. SHA guards all writes.
 
-Schema-v2/v3/v4/v5/v6/v7 documents upgrade automatically to v8, preserving recorded amounts, ledger history, device credentials and appearance. Missing income/rule/trip lists start empty during migration, retaining the fixed method and existing history. Retractions retain the original confirmation; a later confirmation is a new record. Update all devices before using the new funding controls.
+Schema-v2/v3/v4/v5/v6/v7/v8 documents upgrade automatically to v9, preserving recorded amounts, ledger history, device credentials and appearance. Missing income/rule/trip/recurring-change lists start empty during migration, retaining the fixed method and existing history. Retractions retain the original confirmation; a later confirmation is a new record. Update all devices before using the new funding controls.
 
 See [plan.md](plan.md), [architecture](docs/architecture.md) and [milestone.md](milestone.md). The owner authorized this expense/settlement pass; remaining financial milestones still require review.
 

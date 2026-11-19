@@ -156,6 +156,42 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await page.reload();
   await navigate(page, 'Travel');
   await expect(offlineTrip).toContainText('€50.00 / €1,963.50');
+  await navigate(page, 'Monthly plan');
+  await page.getByLabel('Planning month').fill('2030-01');
+  await page
+    .getByRole('button', { name: 'Add recurring expense', exact: true })
+    .click();
+  await page
+    .getByLabel('Expense name', { exact: true })
+    .fill('Offline recurring');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('100');
+  await page.getByRole('button', { name: 'Add to plan', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await page.getByLabel('Planning month').fill('2030-03');
+  const offlineSchedule = page
+    .locator('.expense-row')
+    .filter({ hasText: 'Offline recurring' });
+  await offlineSchedule.getByText('Manage', { exact: true }).click();
+  await offlineSchedule
+    .getByRole('button', { name: 'Edit', exact: true })
+    .click();
+  await page.getByLabel('Monthly amount', { exact: true }).fill('150');
+  await page
+    .getByRole('button', { name: 'Apply edit to plan', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await page.reload();
+  await navigate(page, 'Monthly plan');
+  await page.getByLabel('Planning month').fill('2030-02');
+  await expect(page.getByTestId('operating-target')).toHaveText('€100.00');
+  await page.getByLabel('Planning month').fill('2030-03');
+  await expect(page.getByTestId('operating-target')).toHaveText('€150.00');
   // The fictional history chunk is precached, even before the first sample visit.
   await page.goto('./?demo=1');
   await expect(
@@ -485,9 +521,80 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   });
   await expect(syncedTrip.getByRole('progressbar')).toHaveCount(1);
   await expect(syncedTrip).toContainText('€100.00 / €1,963.50');
+  await context.setOffline(true);
+  await navigate(page, 'Monthly plan');
+  await page.getByLabel('Planning month').fill('2030-01');
+  await page
+    .getByRole('button', { name: 'Add recurring expense', exact: true })
+    .click();
+  await page
+    .getByLabel('Expense name', { exact: true })
+    .fill('Synced recurring');
+  await page.getByLabel('Monthly amount', { exact: true }).fill('100');
+  await page.getByRole('button', { name: 'Add to plan', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await page.getByLabel('Planning month').fill('2030-03');
+  const recurring = page
+    .locator('.expense-row')
+    .filter({ hasText: 'Synced recurring' });
+  await recurring.getByText('Manage', { exact: true }).click();
+  await recurring.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('Monthly amount', { exact: true }).fill('120');
+  await page
+    .getByRole('button', { name: 'Apply edit to plan', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await context.setOffline(false);
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Monthly plan');
+  await second.getByLabel('Planning month').fill('2030-03');
+  await expect(
+    second.locator('.expense-row').filter({ hasText: 'Synced recurring' }),
+  ).toContainText('€120.00');
+  await second.getByLabel('Planning month').fill('2030-02');
+  await expect(
+    second.locator('.expense-row').filter({ hasText: 'Synced recurring' }),
+  ).toContainText('€100.00');
+  expect(
+    JSON.parse(Buffer.from(remote!.content, 'base64').toString('utf8'))
+      .expenseChanges,
+  ).toHaveLength(1);
+  await context.setOffline(true);
+  await navigate(page, 'Monthly plan');
+  await recurring.getByText('Manage', { exact: true }).click();
+  page.once('dialog', (d) => d.accept());
+  await recurring.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Save monthly plan', exact: true })
+    .click();
+  await expect(page.locator('.message.success')).toBeVisible();
+  await context.setOffline(false);
+  await navigate(page, 'Settings');
+  await page.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(page)).toContainText('Synced with');
+  await navigate(second, 'Settings');
+  await second.getByRole('button', { name: 'Sync now' }).click();
+  await expect(status(second)).toContainText('Synced with');
+  await navigate(second, 'Monthly plan');
+  await expect(
+    second.locator('.expense-row').filter({ hasText: 'Synced recurring' }),
+  ).toHaveCount(0);
   const withIncome = JSON.parse(
     Buffer.from(remote!.content, 'base64').toString('utf8'),
   );
+  expect(withIncome.expenses).toHaveLength(0);
+  expect(withIncome.expenseChanges).toHaveLength(0);
   expect(withIncome.trips).toHaveLength(1);
   expect(withIncome.trips[0].allocatedMinor).toBe(10000);
   expect(withIncome.trips[0].otherMinor).toBe(25000);
@@ -496,7 +603,7 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   expect(uploaded.ledger).toHaveLength(5);
   expect(uploaded.transfers).toHaveLength(3);
   expect(uploaded.transferRetractions).toHaveLength(1);
-  expect(uploaded.schemaVersion).toBe(8);
+  expect(uploaded.schemaVersion).toBe(9);
   await secondContext.close();
 });
 

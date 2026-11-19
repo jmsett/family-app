@@ -93,7 +93,7 @@ export { same as sameHousehold };
 export function decodeHousehold(value: unknown): HouseholdPlan {
   const doc = upgradeHousehold(value);
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     revision: doc.revision,
     trips: doc.trips.map((t) => ({
       id: t.id,
@@ -125,6 +125,16 @@ export function decodeHousehold(value: unknown): HouseholdPlan {
       operatingBasisPoints: r.operatingBasisPoints,
       leisureBasisPoints: r.leisureBasisPoints,
       savingsBasisPoints: r.savingsBasisPoints,
+    })),
+    expenseChanges: doc.expenseChanges.map((c) => ({
+      expenseId: c.expenseId,
+      month: c.month,
+      name: c.name,
+      amountMinor: c.amountMinor,
+      dueDay: c.dueDay,
+      endDate: c.endDate,
+      category: c.category,
+      labels: [...c.labels],
     })),
     expenses: doc.expenses.map((e) => ({
       id: e.id,

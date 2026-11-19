@@ -84,6 +84,7 @@ function ExpenseEditor({
     ...new Set([
       ...EXPENSE_CATEGORIES,
       ...document.expenses.map((e) => e.category),
+      ...document.expenseChanges.map((c) => c.category),
       ...document.ledger
         .filter((e): e is PostedExpense => e.kind === 'expense')
         .map((e) => e.category),

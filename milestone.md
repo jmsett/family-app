@@ -1,6 +1,17 @@
 # Milestones and owner review gates
 
-## Travel goals from joint savings — current review slice
+## Recurring corrections and deletion — current review slice
+
+**Status: implemented; local verification passed, owner review pending.** Owner requested edit scopes from the selected month onward or across all history, and full deletion of recurring planning history.
+
+- Monthly plan Manage exposes Edit, Archive and Delete; changes stage until the atomic plan save. Edits cover name, amount, due day, category, labels and end date. Unfinished edits protect navigation.
+- Schema 9 snapshots preserve earlier months for forward edits or replace the full timeline for retroactive corrections. Historical target charts follow those versions; archive boundaries, captured funding and actual ledger records remain intact.
+- Confirmed deletion removes the schedule and all versions from historical budgets. Git history/exports may still hold older copies. Existing three-way sync conflicts prevent stale monetary-only uploads from restoring deleted schedules; competing plan edits require review.
+- Verification passed: type checking, lint, build, formatting, 108 unit/API/domain/sync tests, 48 desktop/Android workflows and six production PWA cases. Coverage includes scopes/version replacement, invalid inputs and bounds, historical charts, retained money/ledger, archived editing, deletion, offline reload and correction/deletion syncing to a second device. Actual phone and private-repository interaction remain owner review.
+
+Try: Monthly plan → choose month → Manage → Edit → choose scope → Apply edit to plan → Save monthly plan. Use Manage → Delete, then Save, to remove that schedule from all months.
+
+## Travel goals from joint savings — earlier review slice
 
 **Status: implemented; local verification passed, owner review pending.** Owner requested an airplane submenu and clarified one progress bar, funded from joint savings.
 

@@ -2289,3 +2289,39 @@ nav button.nav-icon {
     justify-content: center;
   }
 }
+
+.recurring-manage > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+}
+.recurring-manage > summary::after {
+  content: '⌄';
+  margin-left: 8px;
+}
+.recurring-manage > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.recurring-manage .destructive {
+  color: var(--balance-negative);
+}
+.expense-actions:has(.recurring-manage) {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+.expense-form fieldset {
+  display: grid;
+  gap: 16px;
+}
+@media (max-width: 600px) {
+  .recurring-manage > div {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}

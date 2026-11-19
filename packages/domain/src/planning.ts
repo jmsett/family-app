@@ -4,6 +4,7 @@ import type {
   FundingRule,
   HouseholdPlan,
   RecurringExpense,
+  RecurringExpenseChange,
   TransferConfirmation,
 } from '@family/shared';
 import { MAX_MINOR, validateDraft } from './index';
@@ -41,10 +42,11 @@ function amount(value: number) {
 }
 export function initialHousehold(): HouseholdPlan {
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     revision: 0,
     memberNames: ['Member A', 'Member B'],
     expenses: [],
+    expenseChanges: [],
     savingsTargets: [],
     incomes: [],
     fundingRules: [],
@@ -98,7 +100,7 @@ export function validateExpense(expense: RecurringExpense): void {
     );
 }
 export function dueDate(
-  expense: RecurringExpense,
+  expense: RecurringExpense & { dueDay?: number },
   month: string,
 ): string | null {
   if (!validMonth(month))
@@ -110,19 +112,89 @@ export function dueDate(
     return null;
   const [year, index] = month.split('-').map(Number);
   const day = Math.min(
-    Number(expense.firstDueDate.slice(8)),
+    expense.dueDay ?? Number(expense.firstDueDate.slice(8)),
     new Date(Date.UTC(year, index, 0)).getUTCDate(),
   );
   const due = `${month}-${String(day).padStart(2, '0')}`;
   return expense.endDate && due > expense.endDate ? null : due;
 }
+export function recurringExpenseFor(
+  doc: HouseholdPlan,
+  id: string,
+  month: string,
+): RecurringExpense & { dueDay: number } {
+  const original = doc.expenses.find((e) => e.id === id);
+  if (!original || !validMonth(month))
+    throw new Error('Choose a recurring expense and a valid month.');
+  const change = [...doc.expenseChanges]
+    .filter((c) => c.expenseId === id && c.month <= month)
+    .sort((a, b) => b.month.localeCompare(a.month))[0];
+  return recurringValues(original, change);
+}
+function recurringValues(
+  original: RecurringExpense,
+  change?: RecurringExpenseChange,
+): RecurringExpense & { dueDay: number } {
+  return change
+    ? {
+        ...original,
+        name: change.name,
+        amountMinor: change.amountMinor,
+        dueDay: change.dueDay,
+        endDate: change.endDate,
+        category: change.category,
+        labels: [...change.labels],
+      }
+    : { ...original, dueDay: Number(original.firstDueDate.slice(8)) };
+}
+export function editRecurringExpense(
+  doc: HouseholdPlan,
+  id: string,
+  month: string,
+  values: Omit<RecurringExpenseChange, 'expenseId' | 'month'>,
+  scope: 'forward' | 'all',
+): HouseholdPlan {
+  const original = doc.expenses.find((e) => e.id === id);
+  if (!original || !validMonth(month) || !['forward', 'all'].includes(scope))
+    throw new Error('Choose a recurring expense, month and edit scope.');
+  const from = scope === 'all' ? original.firstDueDate.slice(0, 7) : month;
+  if (from < original.firstDueDate.slice(0, 7))
+    throw new Error(
+      'Choose a month on or after the first payment, or apply to all months.',
+    );
+  const change = { ...values, expenseId: id, month: from };
+  const next = {
+    ...doc,
+    expenseChanges: [
+      ...doc.expenseChanges.filter((c) => c.expenseId !== id || c.month < from),
+      change,
+    ],
+  };
+  validateHousehold(next);
+  return next;
+}
+export function deleteRecurringExpense(
+  doc: HouseholdPlan,
+  id: string,
+): HouseholdPlan {
+  if (!doc.expenses.some((e) => e.id === id))
+    throw new Error('Recurring expense not found.');
+  const next = {
+    ...doc,
+    expenses: doc.expenses.filter((e) => e.id !== id),
+    expenseChanges: doc.expenseChanges.filter((c) => c.expenseId !== id),
+  };
+  validateHousehold(next);
+  return next;
+}
 export function validateHousehold(doc: HouseholdPlan): void {
   if (
     !doc ||
-    doc.schemaVersion !== 8 ||
+    doc.schemaVersion !== 9 ||
     !Number.isSafeInteger(doc.revision) ||
     doc.revision < 0 ||
     !Array.isArray(doc.expenses) ||
+    !Array.isArray(doc.expenseChanges) ||
     !Array.isArray(doc.savingsTargets) ||
     !Array.isArray(doc.incomes) ||
     !Array.isArray(doc.fundingRules) ||
@@ -143,6 +215,7 @@ export function validateHousehold(doc: HouseholdPlan): void {
   });
   if (
     doc.expenses.length > 1000 ||
+    doc.expenseChanges.length > 5000 ||
     doc.transfers.length > 5000 ||
     doc.transferRetractions.length > 5000 ||
     doc.savingsTargets.length > 1212 ||
@@ -156,6 +229,32 @@ export function validateHousehold(doc: HouseholdPlan): void {
     validateExpense(expense);
     if (ids.has(expense.id)) throw new Error('Duplicate expense ID.');
     ids.add(expense.id);
+  }
+  ids.clear();
+  const recurringById = new Map(doc.expenses.map((e) => [e.id, e]));
+  for (const change of doc.expenseChanges) {
+    const original = change && recurringById.get(change.expenseId);
+    if (
+      !original ||
+      !validMonth(change.month) ||
+      change.month < original.firstDueDate.slice(0, 7) ||
+      !Number.isInteger(change.dueDay) ||
+      change.dueDay < 1 ||
+      change.dueDay > 31 ||
+      ids.has(`${change.expenseId}:${change.month}`)
+    )
+      throw new Error(
+        'Invalid, orphaned or duplicate recurring expense change.',
+      );
+    validateExpense({
+      ...original,
+      name: change.name,
+      amountMinor: change.amountMinor,
+      endDate: change.endDate,
+      category: change.category,
+      labels: change.labels,
+    });
+    ids.add(`${change.expenseId}:${change.month}`);
   }
   ids.clear();
   for (const target of doc.savingsTargets) {
@@ -270,19 +369,18 @@ export function validateHousehold(doc: HouseholdPlan): void {
   // Validate aggregate limits, including forecasts at future effective boundaries.
   const months = new Set([
     ...doc.expenses.map((e) => e.firstDueDate.slice(0, 7)),
+    ...doc.expenseChanges.map((c) => c.month),
     ...doc.savingsTargets.map((t) => t.month),
     ...doc.incomes.map((t) => t.month),
     ...doc.fundingRules.map((t) => t.month),
     ...doc.transfers.map((t) => t.month),
   ]);
   for (const month of months) {
-    const operating = doc.expenses
-      .filter((e) => dueDate(e, month))
-      .reduce((sum, e) => sum + e.amountMinor, 0);
-    const { operatingMinor: target, savingsMinor: savings } = monthlyPlan(
-      doc,
-      month,
-    );
+    const {
+      recurringMinor: operating,
+      operatingMinor: target,
+      savingsMinor: savings,
+    } = monthlyPlan(doc, month);
     amount(operating);
     amount(target + savings);
     for (const fund of ['operating', 'savings'] as const)
@@ -326,8 +424,15 @@ export function fundingRuleFor(doc: HouseholdPlan, month: string): FundingRule {
 export function monthlyPlan(doc: HouseholdPlan, month: string) {
   if (!validMonth(month))
     throw new Error('Choose a month between 2000 and 2100.');
+  const changes = new Map<string, RecurringExpenseChange>();
+  for (const change of doc.expenseChanges) {
+    const previous = changes.get(change.expenseId);
+    if (change.month <= month && (!previous || previous.month < change.month))
+      changes.set(change.expenseId, change);
+  }
   const expenses = doc.expenses
-    .flatMap((expense) => {
+    .flatMap((original) => {
+      const expense = recurringValues(original, changes.get(original.id));
       const due = dueDate(expense, month);
       return due ? [{ ...expense, due }] : [];
     })
@@ -564,6 +669,22 @@ export function canonicalHousehold(doc: HouseholdPlan): string {
       .sort((a, b) => a.id.localeCompare(b.id))
       .map((e) => JSON.parse(canonicalEvent(e))),
     expenses: [...doc.expenses].sort((a, b) => a.id.localeCompare(b.id)),
+    expenseChanges: [...doc.expenseChanges]
+      .sort(
+        (a, b) =>
+          a.expenseId.localeCompare(b.expenseId) ||
+          a.month.localeCompare(b.month),
+      )
+      .map((c) => ({
+        expenseId: c.expenseId,
+        month: c.month,
+        name: c.name,
+        amountMinor: c.amountMinor,
+        dueDay: c.dueDay,
+        endDate: c.endDate,
+        category: c.category,
+        labels: c.labels,
+      })),
     savingsTargets: [...doc.savingsTargets].sort((a, b) =>
       a.month.localeCompare(b.month),
     ),
@@ -658,6 +779,8 @@ export function upgradeHousehold(value: unknown): HouseholdPlan {
       trips: next.trips.map((t) => ({ ...t, otherMinor: 0 })),
     };
   }
+  if (next.schemaVersion === 8)
+    next = { ...next, schemaVersion: 9, expenseChanges: [] };
   validateHousehold(next as unknown as HouseholdPlan);
   return next as unknown as HouseholdPlan;
 }

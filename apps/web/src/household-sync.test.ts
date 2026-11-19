@@ -92,7 +92,7 @@ describe('household GitHub format', () => {
     expect(result?.document.expenses).toEqual([]);
     expect(result?.document.transfers).toEqual([]);
   });
-  it('round trips schema v8, preserves Unicode, uses SHA and excludes secrets', async () => {
+  it('round trips schema v9, preserves Unicode, uses SHA and excludes secrets', async () => {
     let encoded = '';
     const doc = { ...base, memberNames: ['José', '愛'] as [string, string] };
     const fetcher = vi
@@ -403,4 +403,82 @@ it('preserves trip labels and photos, blocks concurrent allocations and retains 
       sha: 'd',
     }),
   ).toThrow('label changed');
+});
+
+it('synchronizes recurring corrections/deletions without stale financial-only uploads restoring removed schedules', async () => {
+  const {
+    editRecurringExpense,
+    deleteRecurringExpense,
+    monthlyPlan,
+    canonicalHousehold,
+    confirmFundTransfer,
+  } = await import('@family/domain');
+  const original: HouseholdPlan = {
+    ...base,
+    expenses: [
+      {
+        id: 'rent',
+        name: 'Rent',
+        amountMinor: 10000,
+        firstDueDate: '2030-01-01',
+        endDate: null,
+        archivedFromMonth: null,
+        category: 'Home',
+        labels: [],
+      },
+    ],
+  };
+  const edited = editRecurringExpense(
+    original,
+    'rent',
+    '2030-03',
+    {
+      name: 'Rent',
+      amountMinor: 12000,
+      dueDay: 1,
+      endDate: null,
+      category: 'Home',
+      labels: ['fixed'],
+    },
+    'forward',
+  );
+  expect(canonicalHousehold(decodeHousehold(edited))).toBe(
+    canonicalHousehold(edited),
+  );
+  const deleted = deleteRecurringExpense(edited, 'rent');
+  const stale = confirmFundTransfer(
+    edited,
+    '2030-04',
+    0,
+    'savings',
+    '2030-04-02T12:00:00Z',
+  );
+  const merged = reconcile(local({ document: stale, base: edited }), {
+    document: deleted,
+    sha: 'deleted',
+  });
+  expect(merged.expenses).toEqual([]);
+  expect(merged.expenseChanges).toEqual([]);
+  expect(merged.transfers).toHaveLength(1);
+  expect(monthlyPlan(merged, '2030-01').operatingMinor).toBe(0);
+  const competing = editRecurringExpense(
+    edited,
+    'rent',
+    '2030-04',
+    {
+      name: 'Rent',
+      amountMinor: 15000,
+      dueDay: 1,
+      endDate: null,
+      category: 'Home',
+      labels: [],
+    },
+    'forward',
+  );
+  expect(() =>
+    reconcile(local({ document: competing, base: edited }), {
+      document: deleted,
+      sha: 'deleted',
+    }),
+  ).toThrow('Both devices changed the plan');
 });
