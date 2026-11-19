@@ -631,3 +631,56 @@ test('invalid tokens are not remembered after reopening the app', async ({
   await expect(page.getByLabel('GitHub token')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sync now' })).toHaveCount(0);
 });
+
+test('background synchronization keeps navigation available while financial editing is locked', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let held = false;
+  await page.route(
+    /^https:\/\/api\.github\.com\/repos\/jmsett\/family-data(?:\/.*)?$/,
+    async (route) => {
+      const url = route.request().url();
+      if (!url.includes('/contents/'))
+        return route.fulfill({
+          json: { private: true, default_branch: 'main' },
+          headers: { 'Access-Control-Allow-Origin': '*' },
+        });
+      if (url.includes('/contents/household.json') && !held) {
+        held = true;
+        await gate;
+      }
+      return route.fulfill({
+        status: 404,
+        json: {},
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      });
+    },
+  );
+  await page.goto('./');
+  await connect(page);
+  const status = page
+    .getByRole('region', { name: 'Device synchronization' })
+    .getByRole('status');
+  await expect(status).toContainText('Synchronizing');
+  await expect(
+    page.getByRole('button', { name: 'Overview', exact: true }),
+  ).toBeEnabled();
+  await navigate(page, 'Overview');
+  await navigate(page, 'Monthly plan');
+  await expect(
+    page.getByRole('button', { name: 'Add recurring expense', exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByLabel('Planning month')).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Settings', exact: true }),
+  ).toBeEnabled();
+  await navigate(page, 'Settings');
+  await expect(page.getByLabel('Your identity')).toBeDisabled();
+  release();
+  await expect(status).toContainText('No saved changes to sync');
+  await expect(page.getByLabel('Your identity')).toBeEnabled();
+});

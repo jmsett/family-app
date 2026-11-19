@@ -1215,7 +1215,7 @@ function App() {
                               : 'Travel'
                     }
                     aria-current={view === page ? 'page' : undefined}
-                    disabled={busy || syncBusy}
+                    disabled={busy}
                     onClick={() => {
                       setExpenseTrip(null);
                       changeView(page);
@@ -1230,7 +1230,7 @@ function App() {
                 aria-label="Settings"
                 title="Settings"
                 aria-current={view === 'settings' ? 'page' : undefined}
-                disabled={busy || syncBusy}
+                disabled={busy}
                 onClick={() => changeView('settings')}
               >
                 <svg

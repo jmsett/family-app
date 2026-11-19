@@ -8,7 +8,7 @@ Forward edits replace snapshots from the selected month onward, retaining earlie
 
 Validate change references, unique schedule/month pairs, positive integer-cent amounts, due days 1–31, metadata and original-date/end constraints. Include every effective change month in aggregate-limit validation. Group snapshots once per monthly projection to avoid repeated scans per schedule. Canonical serialization and decoding normalize change fields, and existing three-way plan conflicts cover edits/deletions. A stale financial-only device adopts the remote deletion while retaining immutable financial events; competing plan edits require review. Schemas 2–8 migrate to empty change history with no fabricated corrections, altered financial records or credential changes.
 
-Verification covers scope/version replacement, month-end/end/archive boundaries, aggregate limits, historical charts, deletion retaining cash/ledger, malformed references/migration, stale-device sync, phone/desktop edit/delete forms and production offline/two-device workflows.
+Verification covers scope/version replacement, month-end/end/archive boundaries, aggregate limits, historical charts, deletion retaining cash/ledger, malformed references/migration, stale-device sync, phone/desktop edit/delete forms and production offline/two-device workflows. Navigation remains available during background sync; financial editing and month changes stay disabled until it finishes. A held-response PWA test verifies both behaviors without timing sleeps.
 
 ## ADR 020: Planned lump-sum trip costs alongside contingency
 
