@@ -1,4 +1,5 @@
 import { Select } from './Select';
+import { ChevronDown } from './ChevronDown';
 import { useState } from 'react';
 import { EXPENSE_CATEGORIES } from '@family/domain';
 import {
@@ -35,7 +36,7 @@ export function AppearancePanel({
                 : `${preferences.theme[0].toUpperCase()}${preferences.theme.slice(1)}`}
             </small>
           </span>
-          <span aria-hidden="true">⌄</span>
+          <ChevronDown className="disclosure-icon" />
         </summary>
         <div className="appearance-content">
           <p className="muted">

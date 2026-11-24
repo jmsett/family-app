@@ -32,6 +32,7 @@ export function Modal({
   const release = useRef<(() => Promise<void>) | null>(null);
   const completion = useRef<(() => void) | null>(null);
   const latestDismiss = useRef(onDismiss);
+  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   latestDismiss.current = onDismiss;
   useEffect(() => {
     const element = dialog.current!;
@@ -84,6 +85,11 @@ export function Modal({
     completion.current = action;
     if (release.current) await release.current();
     else action();
+  }
+  function resetDrag() {
+    drag.current = null;
+    dialog.current?.removeAttribute('data-dragging');
+    dialog.current?.style.removeProperty('--dialog-drag-offset');
   }
   return createPortal(
     <dialog
@@ -138,24 +144,80 @@ export function Modal({
           void close();
       }}
     >
-      <div className="dialog-heading">
-        <h2 id={heading}>{title}</h2>
-        <button
-          type="button"
-          className="dialog-close"
-          aria-label="Close dialog"
-          onClick={() => void close()}
-        >
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path
-              d="m6 6 12 12M18 6 6 18"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              fill="none"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+      <div
+        className="dialog-header"
+        onPointerDown={(event) => {
+          if (
+            !matchMedia('(max-width: 650px)').matches ||
+            !event.isPrimary ||
+            event.button !== 0 ||
+            (event.target as HTMLElement).closest('button')
+          )
+            return;
+          drag.current = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+          };
+          event.currentTarget.setPointerCapture(event.pointerId);
+          dialog.current?.setAttribute('data-dragging', '');
+        }}
+        onPointerMove={(event) => {
+          const start = drag.current;
+          if (!start || start.id !== event.pointerId) return;
+          const dx = event.clientX - start.x;
+          const dy = event.clientY - start.y;
+          if (Math.abs(dx) > Math.max(10, Math.abs(dy))) {
+            resetDrag();
+            return;
+          }
+          dialog.current?.style.setProperty(
+            '--dialog-drag-offset',
+            `${Math.max(0, dy)}px`,
+          );
+        }}
+        onPointerUp={(event) => {
+          const start = drag.current;
+          const element = dialog.current;
+          if (!start || start.id !== event.pointerId || !element) return;
+          const dx = event.clientX - start.x;
+          const dy = event.clientY - start.y;
+          const threshold = Math.min(
+            100,
+            Math.max(64, element.offsetHeight / 4),
+          );
+          if (dy >= threshold && dy > Math.abs(dx)) {
+            drag.current = null;
+            void close();
+          } else resetDrag();
+        }}
+        onPointerCancel={resetDrag}
+        onLostPointerCapture={() => {
+          if (drag.current) resetDrag();
+        }}
+      >
+        <div className="dialog-drag-handle" aria-hidden="true">
+          <span />
+        </div>
+        <div className="dialog-heading">
+          <h2 id={heading}>{title}</h2>
+          <button
+            type="button"
+            className="dialog-close"
+            aria-label="Close dialog"
+            onClick={() => void close()}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                d="m6 6 12 12M18 6 6 18"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                fill="none"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
       {children(close)}
     </dialog>,

@@ -1,4 +1,5 @@
 import { confirmAction } from './Confirmation';
+import { ChevronDown } from './ChevronDown';
 import { useEffect, useRef, useState } from 'react';
 import { GitHubHousehold, reconcile, sameHousehold } from './household-sync';
 import { readRecord, writeRecord } from './storage';
@@ -211,9 +212,7 @@ export function SyncPanel({
           <span className="sync-status" role="status">
             {status}
           </span>
-          <span className="disclosure-icon" aria-hidden="true">
-            ⌄
-          </span>
+          <ChevronDown className="disclosure-icon" />
         </summary>
         <div className="sync-content">
           {!token ? (

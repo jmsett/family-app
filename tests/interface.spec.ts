@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 const sample = JSON.parse(
   readFileSync(
@@ -8,6 +8,133 @@ const sample = JSON.parse(
 ) as HouseholdPlan;
 import type { HouseholdPlan } from '@family/shared';
 import { navigate } from './helpers';
+
+async function touchDrag(
+  page: Page,
+  target: Locator,
+  dx: number,
+  dy: number,
+  cancel = false,
+) {
+  const bounds = (await target.boundingBox())!;
+  const x = bounds.x + bounds.width / 2;
+  const y = bounds.y + bounds.height / 2;
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x, y }],
+    });
+    for (let step = 1; step <= 6; step++) {
+      await session.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: x + (dx * step) / 6, y: y + (dy * step) / 6 }],
+      });
+    }
+    await session.send('Input.dispatchTouchEvent', {
+      type: cancel ? 'touchCancel' : 'touchEnd',
+      touchPoints: [],
+    });
+  } finally {
+    await session.detach();
+  }
+}
+
+test('mobile dropdowns open on the first completed tap and allow repeated touch selection', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'Requires touch input');
+  await page.goto('/');
+  await navigate(page, 'Settings');
+  const identity = page.getByLabel('Your identity', { exact: true });
+  await identity.scrollIntoViewIfNeeded();
+  const bounds = (await identity.boundingBox())!;
+  const session = await page.context().newCDPSession(page);
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: bounds.x + bounds.width / 2, y: bounds.y + 24 }],
+  });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await session.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+  });
+  await session.detach();
+  const picker = page.getByRole('dialog', {
+    name: 'Your identity',
+    exact: true,
+  });
+  await expect(picker).toBeVisible();
+  await picker.getByRole('option', { name: 'Member A', exact: true }).tap();
+  await expect(picker).toHaveCount(0);
+  await expect(identity).toHaveValue('0');
+  await expect(identity).toBeFocused();
+  for (let i = 0; i < 3; i++) {
+    await identity.tap();
+    await expect(picker).toBeVisible();
+    await picker.getByRole('button', { name: 'Close dialog' }).tap();
+    await expect(picker).toHaveCount(0);
+  }
+  // A scrolling gesture beginning on a select must not open a picker.
+  await touchDrag(page, identity, 0, -80);
+  await expect(picker).toHaveCount(0);
+});
+
+test('mobile sheet handles dismiss downward and snap back for short, horizontal or canceled drags', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'Requires a mobile sheet and touch input');
+  await page.goto('/');
+  await navigate(page, 'Settings');
+  const identity = page.getByLabel('Your identity', { exact: true });
+  await identity.tap();
+  const picker = page.getByRole('dialog');
+  const handle = picker.locator('.dialog-drag-handle');
+  const originalTop = (await picker.boundingBox())!.y;
+  for (const [dx, dy, cancel] of [
+    [0, 24, false],
+    [90, 8, false],
+    [0, 120, true],
+  ] as const) {
+    await touchDrag(page, handle, dx, dy, cancel);
+    await expect(picker).toBeVisible();
+    await expect
+      .poll(async () => Math.abs((await picker.boundingBox())!.y - originalTop))
+      .toBeLessThan(1);
+  }
+  await touchDrag(page, handle, 0, 120);
+  await expect(picker).toHaveCount(0);
+  await expect(identity).toBeFocused();
+  await expect(identity).toHaveValue('');
+  // Dismissal consumes only the overlay's Back entry.
+  await page.goBack();
+  await expect(
+    page.getByRole('heading', { name: 'Overview', exact: true }),
+  ).toBeVisible();
+});
+
+test('swiping a mobile confirmation cancels the action', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'Requires a mobile sheet and touch input');
+  await page.goto('/?demo=1');
+  const money = await page.getByTestId('operating-funds').textContent();
+  const retract = page.getByRole('button', {
+    name: 'Retract my operating confirmation',
+    exact: true,
+  });
+  await retract.tap();
+  const confirmation = page.locator('.confirmation-dialog');
+  await expect(confirmation).toBeVisible();
+  await touchDrag(page, confirmation.locator('.dialog-heading h2'), 0, 120);
+  await expect(confirmation).toHaveCount(0);
+  await expect(page.getByTestId('operating-funds')).toHaveText(money!);
+  await expect(retract).toBeVisible();
+  await expect(retract).toBeFocused();
+});
 
 test('themed pickers select values, skip disabled options and restore focus', async ({
   page,
@@ -128,6 +255,28 @@ test('long option lists support search, empty results and keyboard selection at 
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test('mobile option lists scroll independently of the sheet drag handle', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'Requires touch scrolling');
+  await seedManyCategories(page);
+  await page.locator('.ledger-history > details > summary').tap();
+  await page.locator('.history-filter-options > summary').tap();
+  const category = page.getByLabel('History category');
+  await category.tap();
+  const picker = page.getByRole('dialog');
+  const options = picker.getByRole('listbox');
+  await touchDrag(page, options, 0, -140);
+  await expect
+    .poll(() => options.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  await expect(picker).toBeVisible();
+  await touchDrag(page, picker.locator('.dialog-drag-handle'), 0, 120);
+  await expect(picker).toHaveCount(0);
+  await expect(category).toBeFocused();
 });
 
 test('Back and Forward return through visited screens without leaving the app', async ({

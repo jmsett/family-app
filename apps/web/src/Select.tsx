@@ -6,6 +6,7 @@ import {
   type SelectHTMLAttributes,
 } from 'react';
 import { Modal } from './Modal';
+import { ChevronDown } from './ChevronDown';
 
 interface Choice {
   value: string;
@@ -72,37 +73,41 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
     : visible.find((option) => !option.disabled)?.value;
   return (
     <>
-      <select
-        {...props}
-        ref={select}
-        className={`app-select ${props.className ?? ''}`}
-        aria-haspopup="dialog"
-        aria-expanded={!!picker}
-        aria-controls={picker ? list : undefined}
-        onPointerDown={(event) => {
-          event.preventDefault();
-          open();
-        }}
-        onClick={(event) => {
-          event.preventDefault();
-          open();
-        }}
-        onKeyDown={(event) => {
-          props.onKeyDown?.(event);
-          if (
-            !event.defaultPrevented &&
-            (['Enter', ' ', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(
-              event.key,
-            ) ||
-              event.key.length === 1)
-          ) {
+      <span className="app-select-field">
+        <select
+          {...props}
+          ref={select}
+          className={`app-select ${props.className ?? ''}`}
+          aria-haspopup="dialog"
+          aria-expanded={!!picker}
+          aria-controls={picker ? list : undefined}
+          onPointerDown={(event) => {
+            // Suppress the native picker. Open only on click: opening earlier
+            // lets the tap's final click hit the new backdrop and dismiss it.
+            event.preventDefault();
+          }}
+          onClick={(event) => {
             event.preventDefault();
             open();
-          }
-        }}
-      >
-        {props.children}
-      </select>
+          }}
+          onKeyDown={(event) => {
+            props.onKeyDown?.(event);
+            if (
+              !event.defaultPrevented &&
+              (['Enter', ' ', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(
+                event.key,
+              ) ||
+                event.key.length === 1)
+            ) {
+              event.preventDefault();
+              open();
+            }
+          }}
+        >
+          {props.children}
+        </select>
+        <ChevronDown className="select-chevron" />
+      </span>
       {picker && (
         <Modal
           title={picker.title}

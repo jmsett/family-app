@@ -11,6 +11,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { useBackLayer } from './navigation';
+import { ChevronDown } from './ChevronDown';
 
 export function ActionMenu({
   label,
@@ -89,6 +90,7 @@ export function ActionMenu({
         }}
       >
         {label}
+        <ChevronDown className="disclosure-icon" />
       </summary>
       <div>
         {Children.map(children, (child) => {
