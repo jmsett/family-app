@@ -189,7 +189,19 @@ test('appearance persists across reopening, updates real bar colors and respects
   await appearance.locator('summary').first().click();
   await page.getByLabel('Theme', { exact: true }).selectOption('light');
   await page.getByLabel('Bar effect', { exact: true }).selectOption('prism');
-  await page.getByLabel('Color palette', { exact: true }).selectOption('prism');
+  await expect(appearance.getByRole('radio')).toHaveCount(5);
+  await page.getByRole('radio', { name: 'Synthwave', exact: true }).check();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-palette',
+    'synthwave',
+  );
+  await expect(
+    page.getByLabel('Interface accent', { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('progressbar', { name: 'Savings preview', exact: true }),
+  ).toHaveCSS('--stop-1', '#b93a95');
+  await page.getByRole('radio', { name: 'Custom', exact: true }).check();
   await page.getByText('Customize bar colors', { exact: true }).click();
   const color = page.getByLabel('Savings start color', { exact: true });
   await color.evaluate((element) => {
@@ -201,6 +213,18 @@ test('appearance persists across reopening, updates real bar colors and respects
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('change', { bubbles: true }));
   });
+  await page.getByRole('radio', { name: 'Replicant', exact: true }).check();
+  await page.reload();
+  await navigate(page, 'Settings');
+  await appearance.locator('summary').first().click();
+  await expect(
+    page.getByRole('radio', { name: 'Replicant', exact: true }),
+  ).toBeChecked();
+  await expect(page.locator('html')).toHaveCSS('--page', '#faf4ed');
+  await page.getByRole('radio', { name: 'Custom', exact: true }).check();
+  await expect(
+    page.getByRole('progressbar', { name: 'Savings preview', exact: true }),
+  ).toHaveCSS('--stop-1', '#12abcd');
   await page.getByLabel('Glow intensity', { exact: true }).fill('35');
   await page.getByLabel('Animation speed', { exact: true }).fill('125');
   await page.getByLabel('Animate bars', { exact: true }).uncheck();

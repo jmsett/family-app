@@ -2,6 +2,28 @@ import { useCallback, useEffect, useState } from 'react';
 
 export type BarEffect = 'halo' | 'prism' | 'flare' | 'pixel' | 'solid';
 export type ColorStops = [string, string, string];
+export interface PaletteColors {
+  accent: string;
+  operating: ColorStops;
+  savings: ColorStops;
+  chartColors: string[];
+}
+interface Surfaces {
+  page: string;
+  panel: string;
+  input: string;
+  text: string;
+  muted: string;
+  border: string;
+  soft: string;
+}
+interface Palette extends PaletteColors {
+  id: string;
+  name: string;
+  description: string;
+  dark: Surfaces;
+  light: Surfaces;
+}
 export interface Appearance {
   version: 1;
   theme: 'dark' | 'light' | 'system';
@@ -14,6 +36,7 @@ export interface Appearance {
   glow: number;
   speed: number;
   motion: boolean;
+  customPalette: PaletteColors | null;
 }
 const KEY = 'family-appearance-v1';
 export const EFFECTS: { id: BarEffect; name: string }[] = [
@@ -23,88 +46,142 @@ export const EFFECTS: { id: BarEffect; name: string }[] = [
   { id: 'pixel', name: 'Pixel rush' },
   { id: 'solid', name: 'Solid' },
 ];
-export const PALETTES = [
+const darkSurfaces: Surfaces = {
+  page: '#090d14',
+  panel: '#121923',
+  input: '#0c121b',
+  text: '#edf3f8',
+  muted: '#a3b2c4',
+  border: '#2b3849',
+  soft: '#1c2939',
+};
+const lightSurfaces: Surfaces = {
+  page: '#f2f5f8',
+  panel: '#ffffff',
+  input: '#f6f8fa',
+  text: '#172536',
+  muted: '#53667c',
+  border: '#cbd5df',
+  soft: '#e5ecf3',
+};
+export const PALETTES: Palette[] = [
   {
-    id: 'jml',
-    name: 'JML multicolor',
-    accent: '#b58aff',
-    operating: ['#278aff', '#5df0ff', '#dcffff'],
-    savings: ['#ffb546', '#ff2ca8', '#7149ff'],
+    id: 'cyberpunk',
+    name: 'Cyberpunk',
+    description: 'Electric yellow · ice cyan',
+    accent: '#f3ed62',
+    operating: ['#139aaa', '#61e8ed', '#b5ffff'],
+    savings: ['#a9b735', '#e8eb65', '#fcf5b0'],
     chartColors: [
-      '#b58aff',
-      '#ff57b5',
-      '#37dbea',
-      '#ffb546',
-      '#74e4ad',
-      '#829cff',
+      '#61e8ed',
+      '#f3ed62',
+      '#fd8bb3',
+      '#a6a0ff',
+      '#73d9ad',
+      '#e5ab75',
     ],
+    dark: darkSurfaces,
+    light: lightSurfaces,
   },
   {
-    id: 'halo',
-    name: 'Electric halo',
-    accent: '#78ecff',
-    operating: ['#278aff', '#5df0ff', '#dcffff'],
-    savings: ['#416bff', '#94aaff', '#e5edff'],
+    id: 'synthwave',
+    name: 'Synthwave',
+    description: 'Hot pink · ultraviolet',
+    accent: '#ff8ada',
+    operating: ['#634bce', '#ac9cff', '#d6ceff'],
+    savings: ['#b93a95', '#ff8ada', '#ffc2ec'],
     chartColors: [
-      '#278aff',
-      '#5df0ff',
-      '#94aaff',
-      '#78c9ff',
-      '#4adbb7',
-      '#d1edff',
+      '#ff8ada',
+      '#ac9cff',
+      '#73def1',
+      '#f4c87d',
+      '#8eddb8',
+      '#cf9cff',
     ],
+    dark: {
+      ...darkSurfaces,
+      page: '#100b1c',
+      panel: '#1b142b',
+      input: '#130e21',
+      border: '#40304f',
+      soft: '#2c203e',
+    },
+    light: {
+      ...lightSurfaces,
+      page: '#f8f2fa',
+      input: '#fcf7fe',
+      border: '#dfcfe5',
+      soft: '#f1e4f5',
+    },
   },
   {
-    id: 'prism',
-    name: 'Liquid prism',
-    accent: '#e5a1ff',
-    operating: ['#69dffd', '#fd76eb', '#65f5cc'],
-    savings: ['#847bff', '#f6cd7d', '#76a7ff'],
+    id: 'replicant',
+    name: 'Replicant',
+    description: 'Desert amber · rain teal',
+    accent: '#ffbd80',
+    operating: ['#287e88', '#6dd6ce', '#b9f0e9'],
+    savings: ['#bc6a36', '#ffbd80', '#ffe0ae'],
     chartColors: [
-      '#69dffd',
-      '#847bff',
-      '#fd76eb',
-      '#f6cd7d',
-      '#65f5cc',
-      '#76a7ff',
+      '#ffbd80',
+      '#6dd6ce',
+      '#d3a5da',
+      '#e5d687',
+      '#95bbf2',
+      '#eb91a0',
     ],
+    dark: {
+      ...darkSurfaces,
+      page: '#130e0c',
+      panel: '#211a16',
+      input: '#17110e',
+      border: '#483a30',
+      soft: '#33271f',
+    },
+    light: {
+      ...lightSurfaces,
+      page: '#faf4ed',
+      input: '#fdf8f2',
+      border: '#dfd0bf',
+      soft: '#f2e7d9',
+    },
   },
   {
-    id: 'flare',
-    name: 'Solar flare',
-    accent: '#ff9cbb',
-    operating: ['#ed3e9b', '#ff6287', '#ffba75'],
-    savings: ['#ffba75', '#ff6287', '#ed3e9b'],
+    id: 'noir',
+    name: 'Neon Noir',
+    description: 'Jade neon · signal coral',
+    accent: '#8ce6bd',
+    operating: ['#278967', '#8ce6bd', '#c5f5df'],
+    savings: ['#b54d63', '#ff9dba', '#ffd1df'],
     chartColors: [
-      '#ed3e9b',
-      '#ff6287',
-      '#ffba75',
-      '#db82f1',
-      '#f196b5',
-      '#f7d084',
+      '#8ce6bd',
+      '#ff9dba',
+      '#86bcef',
+      '#dec38c',
+      '#baabeb',
+      '#7cdbd8',
     ],
-  },
-  {
-    id: 'pixel',
-    name: 'Pixel rush',
-    accent: '#9bf4b5',
-    operating: ['#62ffb6', '#a6ffe2', '#1d5248'],
-    savings: ['#41cdac', '#9bf4b5', '#205e52'],
-    chartColors: [
-      '#62ffb6',
-      '#a6ffe2',
-      '#44bfa4',
-      '#7dbed6',
-      '#b6e89a',
-      '#70dda5',
-    ],
+    dark: {
+      ...darkSurfaces,
+      page: '#090f10',
+      panel: '#121e20',
+      input: '#0c1618',
+      border: '#2d4143',
+      soft: '#203234',
+    },
+    light: {
+      ...lightSurfaces,
+      page: '#eff7f4',
+      input: '#f4faf7',
+      border: '#c6dcd4',
+      soft: '#e0eee8',
+    },
   },
 ];
 export const DEFAULT_APPEARANCE: Appearance = {
   version: 1,
   theme: 'dark',
   effect: 'halo',
-  palette: 'jml',
+  palette: 'cyberpunk',
   accent: PALETTES[0].accent,
   operating: [...PALETTES[0].operating] as ColorStops,
   savings: [...PALETTES[0].savings] as ColorStops,
@@ -112,6 +189,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   glow: 70,
   speed: 100,
   motion: true,
+  customPalette: null,
 };
 export function isColor(value: unknown): value is string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
@@ -133,28 +211,70 @@ export function decodeAppearance(value: unknown): Appearance {
     typeof value === 'number' && Number.isFinite(value)
       ? Math.max(low, Math.min(high, value))
       : fallback;
+  const colors = (value: Partial<PaletteColors>): PaletteColors => ({
+    accent: isColor(value.accent) ? value.accent : DEFAULT_APPEARANCE.accent,
+    operating: stops(value.operating, DEFAULT_APPEARANCE.operating),
+    savings: stops(value.savings, DEFAULT_APPEARANCE.savings),
+    chartColors:
+      Array.isArray(value.chartColors) &&
+      value.chartColors.length === 6 &&
+      value.chartColors.every(isColor)
+        ? [...value.chartColors]
+        : [...DEFAULT_APPEARANCE.chartColors],
+  });
+  const preset = PALETTES.find((p) => p.id === raw.palette);
+  // Earlier palettes become Custom so existing personal colors survive the update.
+  const legacy = ['jml', 'halo', 'prism', 'flare', 'pixel'].includes(
+    raw.palette ?? '',
+  );
+  const palette =
+    preset?.id ??
+    (raw.palette === 'custom' || legacy
+      ? 'custom'
+      : DEFAULT_APPEARANCE.palette);
+  const selected = preset ?? (palette === 'custom' ? raw : PALETTES[0]);
+  const currentColors = colors(selected);
+  const storedCustom =
+    raw.customPalette && typeof raw.customPalette === 'object'
+      ? colors(raw.customPalette)
+      : null;
   return {
     version: 1,
     theme: raw.theme === 'light' || raw.theme === 'system' ? raw.theme : 'dark',
     effect: EFFECTS.some((e) => e.id === raw.effect) ? raw.effect! : 'halo',
-    palette:
-      PALETTES.some((p) => p.id === raw.palette) || raw.palette === 'custom'
-        ? raw.palette!
-        : 'jml',
-    accent: isColor(raw.accent) ? raw.accent : DEFAULT_APPEARANCE.accent,
-    operating: stops(raw.operating, DEFAULT_APPEARANCE.operating),
-    savings: stops(raw.savings, DEFAULT_APPEARANCE.savings),
-    chartColors:
-      Array.isArray(raw.chartColors) &&
-      raw.chartColors.length === 6 &&
-      raw.chartColors.every(isColor)
-        ? [...raw.chartColors]
-        : [...DEFAULT_APPEARANCE.chartColors],
+    palette,
+    ...currentColors,
+    customPalette:
+      palette === 'custom' ? structuredClone(currentColors) : storedCustom,
     glow: bound(raw.glow, 0, 100, 70),
     speed: bound(raw.speed, 25, 200, 100),
     motion: typeof raw.motion === 'boolean' ? raw.motion : true,
   };
 }
+export function selectPalette(preferences: Appearance, id: string): Appearance {
+  const preset = PALETTES.find((p) => p.id === id);
+  if (!preset && id !== 'custom') return preferences;
+  const customPalette =
+    preferences.palette === 'custom'
+      ? {
+          accent: preferences.accent,
+          operating: [...preferences.operating] as ColorStops,
+          savings: [...preferences.savings] as ColorStops,
+          chartColors: [...preferences.chartColors],
+        }
+      : preferences.customPalette;
+  const colors = preset ?? customPalette ?? preferences;
+  return decodeAppearance({
+    ...preferences,
+    palette: id,
+    customPalette,
+    accent: colors.accent,
+    operating: colors.operating,
+    savings: colors.savings,
+    chartColors: colors.chartColors,
+  });
+}
+
 function read(): Appearance {
   try {
     return decodeAppearance(JSON.parse(localStorage.getItem(KEY) ?? 'null'));
@@ -195,7 +315,15 @@ export function useAppearance() {
             : 'light'
           : preferences.theme;
       const root = document.documentElement;
+      const surfaces = (PALETTES.find((p) => p.id === preferences.palette) ??
+        PALETTES[0])[theme];
+      for (const [name, color] of Object.entries(surfaces)) {
+        root.style.setProperty(`--${name}`, color);
+      }
       root.dataset.theme = theme;
+      root.dataset.palette = preferences.palette;
+      root.style.setProperty('--operating-color', preferences.operating[1]);
+      root.style.setProperty('--savings-color', preferences.savings[1]);
       root.dataset.motion = String(preferences.motion);
       root.style.setProperty('--accent', preferences.accent);
       root.style.setProperty('--accent-ink', contrastInk(preferences.accent));
@@ -212,7 +340,7 @@ export function useAppearance() {
       root.style.colorScheme = theme;
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute('content', theme === 'dark' ? '#080914' : '#f7f5fb');
+        ?.setAttribute('content', surfaces.page);
     };
     apply();
     media.addEventListener('change', apply);

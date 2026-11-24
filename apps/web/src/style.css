@@ -10,16 +10,20 @@
   background: var(--page);
   font-synthesis: none;
   font-size: 14px;
-  --page: #080914;
-  --panel: #12142a;
-  --input: #0d1020;
-  --text: #e8eafa;
-  --muted: #acb0cd;
-  --border: #343850;
-  --accent: #b58aff;
+  line-height: 1.5;
+  --page: #090d14;
+  --panel: #121923;
+  --input: #0c121b;
+  --text: #edf3f8;
+  --muted: #a3b2c4;
+  --border: #2b3849;
+  --accent: #f3ed62;
   --accent-ink: #080914;
+  --accent-text: var(--accent);
+  --operating-color: #61e8ed;
+  --savings-color: #e8eb65;
   --green: color-mix(in srgb, var(--accent) 45%, var(--text));
-  --soft: #1d2038;
+  --soft: #1c2939;
   --error-text: #ffb2aa;
   --error-bg: #2b1722;
   --error-border: #76404c;
@@ -33,6 +37,7 @@
   color-scheme: dark;
 }
 :root[data-theme='light'] {
+  --accent-text: color-mix(in srgb, var(--accent) 35%, var(--text));
   --page: #f7f5fb;
   --panel: #ffffff;
   --input: #ffffff;
@@ -55,7 +60,8 @@ body {
   margin: 0;
 }
 button,
-input {
+input,
+select {
   font: inherit;
 }
 button,
@@ -91,7 +97,7 @@ p {
   margin: 0;
 }
 h1 {
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 650;
   letter-spacing: -0.6px;
 }
@@ -108,13 +114,14 @@ h3 {
   min-height: 100dvh;
 }
 .app-header {
-  background: var(--panel);
+  background: var(--page);
   border-bottom: 1px solid var(--border);
+  padding-top: env(safe-area-inset-top);
 }
 .header-inner {
   max-width: 1160px;
   margin-inline: auto;
-  min-height: 64px;
+  min-height: 84px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -148,7 +155,7 @@ nav {
 }
 nav button {
   border: 0;
-  border-radius: 7px;
+  border-radius: 10px;
   padding: 0 16px;
   min-height: 48px;
   background: transparent;
@@ -170,7 +177,7 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-block: 24px 16px;
+  padding-block: 32px 24px;
 }
 .month-picker {
   display: flex;
@@ -188,7 +195,7 @@ input:not([type='range']) {
   min-height: 48px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 10px;
   background: var(--panel);
   color: var(--text);
   font-size: 16px;
@@ -227,7 +234,7 @@ input:not([type='range']) {
 .summary-card {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 18px;
   padding: 16px 20px;
   background: var(--panel);
 }
@@ -266,8 +273,8 @@ input:not([type='range']) {
 .panel {
   min-width: 0;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px;
+  border-radius: 18px;
+  padding: 24px;
   background: var(--panel);
 }
 .section-heading {
@@ -355,7 +362,7 @@ input[type='range'] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   padding: 12px;
-  border-radius: 7px;
+  border-radius: 10px;
   background: var(--soft);
 }
 .member-targets > div {
@@ -414,7 +421,7 @@ input[type='range'] {
 }
 .primary {
   border: 0;
-  border-radius: 7px;
+  border-radius: 10px;
   min-height: 48px;
   padding: 10px 24px;
   color: var(--accent-ink);
@@ -508,7 +515,7 @@ details[open] .disclosure-icon {
   width: 100%;
   margin-top: 8px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 10px;
   background: var(--soft);
   padding: 10px 12px;
   text-align: left;
@@ -534,7 +541,7 @@ footer {
   padding: 12px 14px;
   margin-bottom: 12px;
   border: 1px solid;
-  border-radius: 7px;
+  border-radius: 10px;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -683,8 +690,8 @@ footer {
     gap: 12px;
   }
   .panel {
-    border-radius: 8px;
-    padding: 16px;
+    border-radius: 16px;
+    padding: 18px;
   }
   .section-heading {
     margin-bottom: 14px;
@@ -767,7 +774,7 @@ select {
   min-height: 48px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 10px;
   color: var(--text);
   background: var(--panel);
   font-size: 16px;
@@ -878,7 +885,7 @@ select:focus-visible {
   min-height: 48px;
   padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 10px;
   background: var(--soft);
   color: var(--green);
   font-size: 13px;
@@ -1031,7 +1038,7 @@ select:focus-visible {
   }
 }
 
-/* JML / Afterglow branding. Layout stays compact; color and motion are reusable. */
+/* Shared color effects follow the active device palette. */
 body {
   background:
     radial-gradient(
@@ -1318,6 +1325,69 @@ select {
 }
 .appearance-content > .secondary {
   justify-self: start;
+}
+.palette-picker legend {
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.palette-option {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--input);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.palette-option:has(input:checked) {
+  border-color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 6%, var(--input));
+}
+.palette-option input[type='radio'] {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--accent-text);
+}
+.palette-option strong {
+  font-size: 14px;
+}
+.palette-option small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.palette-swatches {
+  display: flex;
+  gap: 4px;
+  padding-right: 22px;
+  margin-bottom: 10px;
+}
+.palette-swatches > span {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 12%);
+}
+.custom-palette-editor {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.custom-palette-editor .section-heading {
+  flex-wrap: wrap;
 }
 @media (max-width: 650px) {
   .appearance-panel {
@@ -1728,10 +1798,60 @@ select {
 }
 
 nav button.nav-icon {
-  width: 48px;
-  padding: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+}
+.nav-icon > span {
+  font-size: 12px;
+}
+.brand-name small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.3px;
+  color: var(--muted);
+}
+.page-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.7px;
+  text-transform: uppercase;
+}
+.funds-grid .summary-card {
+  --fund-color: var(--operating-color);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--fund-color) 7%, var(--panel)),
+    var(--panel) 75%
+  );
+  border-top-color: color-mix(in srgb, var(--fund-color) 45%, var(--border));
+}
+.funds-grid .fund-savings {
+  --fund-color: var(--savings-color);
+}
+.funds-grid .card-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.funds-grid .card-label::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--fund-color);
+}
+.fund-month {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
 .member-you {
   display: inline;
@@ -1753,21 +1873,21 @@ nav button.nav-icon {
   display: grid;
   grid-template-rows: auto minmax(48px, 1fr) auto;
   align-items: center;
-  padding-block: 12px;
+  padding: 20px;
 }
 .funds-grid .summary-card > .fund-value {
   display: flex;
   justify-content: center;
   align-items: center;
   margin: 0;
-  min-height: 48px;
+  min-height: 84px;
   line-height: 1.15;
 }
 .fund-due {
   display: block;
   color: var(--muted);
   text-align: center;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
 .fund-due > span {
@@ -1810,7 +1930,7 @@ nav button.nav-icon {
 .chart-style button[aria-pressed='true'],
 .chart-intervals button[aria-pressed='true'] {
   background: var(--soft);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .chart-readout {
   display: grid;
@@ -2087,7 +2207,7 @@ nav button.nav-icon {
 .home-price-result strong {
   font-size: clamp(22px, 4vw, 34px);
   overflow-wrap: anywhere;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .home-price-result span,
 .home-price-result small {
@@ -2204,7 +2324,7 @@ nav button.nav-icon {
   text-align: right;
   font-size: 38px;
   line-height: 1.1;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .trip-funded small {
   color: var(--muted);
@@ -2363,5 +2483,151 @@ nav button.nav-icon {
   .spending-scope {
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
+  }
+}
+
+@media (min-width: 651px) and (max-width: 720px) {
+  nav button.nav-icon {
+    padding-inline: 10px;
+  }
+}
+
+/* The same navigation sits in the thumb zone on phones. */
+@media (max-width: 650px) {
+  html {
+    scroll-padding-bottom: 100px;
+  }
+  .app-shell {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  .header-inner {
+    min-height: 76px;
+    padding-inline: 20px;
+    justify-content: space-between;
+  }
+  .brand,
+  .brand > span:last-child {
+    display: flex;
+  }
+  .brand {
+    gap: 10px;
+    font-size: 18px;
+  }
+  .brand > .brand-name:last-child {
+    display: block;
+  }
+  .header-actions nav {
+    position: fixed;
+    z-index: 20;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    padding: 8px 10px max(8px, env(safe-area-inset-bottom));
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+  }
+  nav button.nav-icon {
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    min-height: 58px;
+    padding: 6px 2px;
+    border-radius: 12px;
+  }
+  nav .selected {
+    color: var(--accent-text);
+    background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+    box-shadow: inset 0 2px var(--accent);
+  }
+  .nav-icon > span {
+    font-size: 10px;
+    font-weight: 500;
+  }
+  main {
+    padding-inline: 16px;
+  }
+  .page-heading {
+    padding-block: 24px 20px;
+    align-items: center;
+  }
+  h1 {
+    font-size: 26px;
+  }
+  .page-eyebrow {
+    font-size: 9px;
+    letter-spacing: 1.2px;
+  }
+  .month-picker input {
+    width: 154px;
+    font-size: 14px;
+  }
+  .funds-grid {
+    gap: 12px;
+  }
+  .funds-grid .summary-card {
+    padding: 14px 12px 8px;
+    border-radius: 16px;
+  }
+  .funds-grid .summary-card > .fund-value {
+    font-size: clamp(21px, 6vw, 28px);
+    min-height: 76px;
+    letter-spacing: -0.8px;
+  }
+  .fund-due {
+    font-size: 10px;
+  }
+  .fund-check {
+    font-size: 10px;
+  }
+  .card-label {
+    font-size: 11px;
+  }
+  .funds-note {
+    margin-block: 12px 24px;
+    font-size: 11px;
+  }
+  .balance-row {
+    padding-block: 16px;
+  }
+  .ledger-panel .entry-actions > .primary {
+    flex: 1;
+  }
+  .appearance-panel {
+    padding: 0;
+  }
+  .palette-option {
+    padding: 12px;
+  }
+  .palette-swatches {
+    gap: 3px;
+  }
+  .palette-swatches > span {
+    width: 17px;
+    height: 17px;
+  }
+  .palette-option small {
+    font-size: 10px;
+  }
+}
+@media (max-width: 360px) {
+  .page-heading {
+    flex-wrap: wrap;
+  }
+  .month-picker,
+  .month-picker input {
+    width: 100%;
+  }
+  .fund-confirmations {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .palette-grid,
+  .input-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .palette-swatches > span {
+    width: 22px;
+    height: 22px;
   }
 }

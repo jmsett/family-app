@@ -6,8 +6,8 @@
   "start_url": "/family-app/",
   "scope": "/family-app/",
   "display": "standalone",
-  "background_color": "#080914",
-  "theme_color": "#080914",
+  "background_color": "#090d14",
+  "theme_color": "#090d14",
   "icons": [
     {
       "src": "icons/icon-192.png",

@@ -735,7 +735,7 @@ function Overview({
     <>
       <section className="funds-grid" aria-label="Recorded funds">
         {(['operating', 'savings'] as const).map((fund) => (
-          <article className="summary-card" key={fund}>
+          <article className={`summary-card fund-${fund}`} key={fund}>
             <span className="card-label">
               {fund === 'operating' ? 'Operating funds' : 'Savings funds'}
             </span>
@@ -1154,6 +1154,7 @@ function App() {
       (!dirty || window.confirm('Discard unsaved changes?'))
     ) {
       setView(next);
+      window.scrollTo({ top: 0, behavior: 'instant' });
       setDirty(false);
       setError('');
       setNotice('');
@@ -1176,7 +1177,9 @@ function App() {
                 width="36"
                 height="36"
               />
-              <span>Family</span>
+              <span className="brand-name">
+                Family<small>Household finances</small>
+              </span>
             </a>
             <div className="header-actions">
               <nav aria-label="Main navigation">
@@ -1222,6 +1225,17 @@ function App() {
                     }}
                   >
                     <NavIcon name={page} />
+                    <span>
+                      {page === 'overview'
+                        ? 'Home'
+                        : page === 'plan'
+                          ? 'Plan'
+                          : page === 'investments'
+                            ? 'Invest'
+                            : page === 'charts'
+                              ? 'Charts'
+                              : 'Travel'}
+                    </span>
                   </button>
                 ))}
               </nav>
@@ -1251,19 +1265,22 @@ function App() {
         </header>
         <main className="focused-main">
           <section className="page-heading">
-            <h1>
-              {view === 'overview'
-                ? 'Overview'
-                : view === 'plan'
-                  ? 'Monthly plan'
-                  : view === 'charts'
-                    ? 'Charts'
-                    : view === 'investments'
-                      ? 'Investments'
-                      : view === 'travel'
-                        ? 'Travel'
-                        : 'Settings'}
-            </h1>
+            <div className="page-intro">
+              <span className="page-eyebrow">Your household</span>
+              <h1>
+                {view === 'overview'
+                  ? 'Overview'
+                  : view === 'plan'
+                    ? 'Monthly plan'
+                    : view === 'charts'
+                      ? 'Charts'
+                      : view === 'investments'
+                        ? 'Investments'
+                        : view === 'travel'
+                          ? 'Travel'
+                          : 'Settings'}
+              </h1>
+            </div>
             {(view === 'overview' || view === 'plan') && (
               <label className="month-picker">
                 <span>Month</span>

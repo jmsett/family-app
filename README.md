@@ -10,7 +10,7 @@ A household finance PWA for two adults. Plan a monthly budget, distinguish contr
 - **Monthly plan:** separate panels for recurring expenses, fixed savings and contribution totals, saved together with **Save monthly plan**. Define recurring expenses with a name, monthly amount, first due date, category and optional labels. Choose monthly recurrence until archived or a final payment date. The operating budget is the sum of payments due in the selected month. Set savings as a separate fixed monthly amount; it carries forward until changed. The default method splits recurring costs and fixed savings 50/50. An optional income-percentage method uses the lower income to set equal operating and savings contributions; see below.
 - **Settings (top-right cog):** “I am” identity for this device, member names, appearance, private GitHub connection, JSON backup and preserved earlier manual targets. Record both members’ net monthly incomes with an effective month. Identity selection saves locally; V1 uses declarations, without authenticated identity or bank verification. History and actual category spending charts are collapsed on Overview and share date/person/category filters.
 
-Top navigation uses accessible **Home**, **Calendar (Monthly plan)**, **Chart (Charts)**, **Investments**, **Travel** and **Settings** icons. Fund cards center their values and show a small monthly total/your-share caption above the confirmation checkmarks.
+Navigation uses accessible **Home**, **Calendar (Monthly plan)**, **Chart (Charts)**, **Investments**, **Travel** and **Settings** icons. Fund cards center their values and show a small monthly total/your-share caption above the confirmation checkmarks.
 
 Monthly due dates repeat on the original day, clamped to the last day in shorter months. End dates are inclusive. Archiving stops a schedule from the selected month and retains the original record and earlier months. Changing a savings target creates an effective-month entry and preserves prior targets.
 
@@ -89,13 +89,21 @@ Contribution records have an assigned planning month and confirmation timestamp.
 
 The renderer is bundled [TradingView Lightweight Charts](https://tradingview.github.io/lightweight-charts/docs/), with the required visible attribution and shipped Apache-2.0/MIT license notices. Household records stay in the browser; this is not an embedded market-data widget. The chart chunk and notices are precached with the rest of the PWA, so Charts works offline even on the first visit after installation.
 
-## JML branding and appearance
+## Mobile design and appearance
 
-The app header, favicon and installable PWA icons use the supplied **Multicolor JML Monogram App Icon**. The default palette combines its violet, pink, amber and cyan with Afterglow's dark surfaces and Electric halo bars.
+The header, favicon and installable PWA icons retain the supplied **Multicolor JML Monogram App Icon**. Phones use labeled bottom navigation for Home, Plan, Charts, Invest and Travel; Settings stays in the header. Larger screens use labeled header navigation. Fund cards distinguish operating and savings with palette colors, with recorded balances, monthly dues and member confirmations kept together.
 
-Open **Settings → Appearance** to choose **Electric halo, Liquid prism, Solar flare, Pixel rush, or Solid**, plus Dark/Light/Device themes. Pick a palette or customize the interface accent, operating/savings gradient stops and six category chart colors. Glow intensity, animation speed and motion are adjustable; device reduced-motion settings always take priority. Live previews include a progress slider and clearly labeled sample chart bars.
+Open **Settings → Appearance** for four curated color schemes and one **Custom** palette:
 
-Preferences save automatically on each device and are separate from household JSON and GitHub credentials. **Reset appearance** restores the JML/Electric halo default without changing financial records or the GitHub connection. Category pie slices and historical plots use the selected colors; previews retain the bar effects; savings-goal tracking remains future work.
+- **Cyberpunk** (default): electric yellow and ice cyan on cool graphite.
+- **Synthwave**: hot pink and ultraviolet on plum.
+- **Replicant**: Blade Runner inspired desert amber and rain teal on warm charcoal.
+- **Neon Noir**: jade neon and signal coral on ink green.
+- **Custom**: edit the interface accent, operating/savings gradient stops and six category chart colors. Your custom colors are retained when trying presets and restored when returning to Custom. Earlier saved palettes and personalized colors migrate to Custom.
+
+Each preset coordinates app surfaces, fund colors, goals and charts, with **Dark / Light / Device** themes. **Electric halo, Liquid prism, Solar flare, Pixel rush, or Solid** bar effects, glow intensity, animation speed and motion remain adjustable independently. Device reduced-motion settings always take priority. Live previews contain clearly labeled sample values.
+
+Preferences save automatically on each device, separately from household JSON and GitHub credentials. **Reset appearance** restores Cyberpunk/Dark/Electric halo and clears the saved custom palette without changing financial records or the GitHub connection. Category pie slices and historical plots use the selected chart colors.
 
 ## Architecture
 

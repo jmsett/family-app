@@ -147,7 +147,7 @@ async function seed(page: Page) {
   }, fixture());
   await page.goto('/');
 }
-test('overview uses a single member balance, compact due captions, separate panels and icon navigation', async ({
+test('overview uses a single member balance, compact due captions, separate panels and labeled navigation', async ({
   page,
 }) => {
   await seed(page);
@@ -174,7 +174,9 @@ test('overview uses a single member balance, compact due captions, separate pane
   await expect(
     page.getByRole('region', { name: 'Spending by category', exact: true }),
   ).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await navigate(page, 'Monthly plan');
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   const recurring = page.getByRole('region', {
     name: 'Recurring expenses',
     exact: true,
@@ -193,11 +195,15 @@ test('overview uses a single member balance, compact due captions, separate pane
     recurring.getByRole('heading', { name: 'Fixed savings', exact: true }),
   ).toHaveCount(0);
   await navigate(page, 'Overview');
-  for (const name of ['Overview', 'Monthly plan', 'Charts']) {
+  for (const [name, label] of [
+    ['Overview', 'Home'],
+    ['Monthly plan', 'Plan'],
+    ['Charts', 'Charts'],
+  ]) {
     const button = page
       .getByRole('navigation')
       .getByRole('button', { name, exact: true });
-    await expect(button).toHaveText('');
+    await expect(button).toHaveText(label);
     await expect(button.locator('svg')).toHaveCount(1);
   }
   const value = await page.getByTestId('operating-funds').boundingBox();

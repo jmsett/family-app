@@ -4,6 +4,7 @@ import {
   DEFAULT_APPEARANCE,
   EFFECTS,
   PALETTES,
+  selectPalette,
   type Appearance,
   type AppearanceController,
   type ColorStops,
@@ -18,17 +19,6 @@ export function AppearancePanel({
   const [progress, setProgress] = useState(72);
   const change = (patch: Partial<Appearance>) =>
     update({ ...preferences, ...patch });
-  function palette(id: string) {
-    const selected = PALETTES.find((p) => p.id === id);
-    if (selected)
-      change({
-        palette: id,
-        accent: selected.accent,
-        operating: [...selected.operating] as ColorStops,
-        savings: [...selected.savings] as ColorStops,
-        chartColors: [...selected.chartColors],
-      });
-  }
   return (
     <section className="panel appearance-panel" aria-label="Appearance">
       <details>
@@ -36,7 +26,9 @@ export function AppearancePanel({
           <span>
             <strong>Appearance</strong>
             <small>
-              {EFFECTS.find((e) => e.id === preferences.effect)?.name} ·{' '}
+              {PALETTES.find((p) => p.id === preferences.palette)?.name ??
+                'Custom'}{' '}
+              ·{' '}
               {preferences.theme === 'system'
                 ? 'Device theme'
                 : `${preferences.theme[0].toUpperCase()}${preferences.theme.slice(1)}`}
@@ -46,9 +38,44 @@ export function AppearancePanel({
         </summary>
         <div className="appearance-content">
           <p className="muted">
-            JML colors and Afterglow effects. Saved automatically on this
-            device.
+            Set the mood for your household. Choose a curated color scheme or
+            make one your own. Saved automatically on this device.
           </p>
+          <fieldset className="palette-picker">
+            <legend>Color scheme</legend>
+            <div className="palette-grid">
+              {[
+                ...PALETTES,
+                {
+                  id: 'custom',
+                  name: 'Custom',
+                  description: 'Your own palette',
+                  accent:
+                    preferences.customPalette?.accent ?? preferences.accent,
+                  chartColors:
+                    preferences.customPalette?.chartColors ??
+                    preferences.chartColors,
+                },
+              ].map((p) => (
+                <label className="palette-option" key={p.id}>
+                  <input
+                    type="radio"
+                    name="color-scheme"
+                    aria-label={p.name}
+                    checked={preferences.palette === p.id}
+                    onChange={() => update(selectPalette(preferences, p.id))}
+                  />
+                  <span className="palette-swatches" aria-hidden="true">
+                    {p.chartColors.slice(0, 4).map((color, i) => (
+                      <span key={i} style={{ backgroundColor: color }} />
+                    ))}
+                  </span>
+                  <strong>{p.name}</strong>
+                  <small>{p.description}</small>
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div className="input-row">
             <label>
               Theme
@@ -79,36 +106,6 @@ export function AppearancePanel({
                   </option>
                 ))}
               </select>
-            </label>
-          </div>
-          <div className="input-row">
-            <label>
-              Color palette
-              <select
-                aria-label="Color palette"
-                value={preferences.palette}
-                onChange={(e) => palette(e.target.value)}
-              >
-                {PALETTES.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-                <option value="custom" disabled>
-                  Custom colors
-                </option>
-              </select>
-            </label>
-            <label className="color-control">
-              Interface accent
-              <input
-                aria-label="Interface accent"
-                type="color"
-                value={preferences.accent}
-                onChange={(e) =>
-                  change({ accent: e.target.value, palette: 'custom' })
-                }
-              />
             </label>
           </div>
           <div className="appearance-ranges">
@@ -147,57 +144,76 @@ export function AppearancePanel({
           <p className="muted">
             Your device’s reduced-motion setting always takes priority.
           </p>
-          <details className="color-options">
-            <summary>Customize bar colors</summary>
-            {(['operating', 'savings'] as const).map((variant) => (
-              <fieldset key={variant}>
-                <legend>
-                  {variant === 'operating'
-                    ? 'Operating bars'
-                    : 'Savings & goal bars'}
-                </legend>
-                <div className="color-stops">
-                  {preferences[variant].map((color, i) => (
-                    <label className="color-control" key={i}>
-                      {['Start', 'Middle', 'End'][i]}
+          {preferences.palette === 'custom' && (
+            <div className="custom-palette-editor">
+              <div className="section-heading">
+                <h3>Your custom palette</h3>
+                <span className="subtle-label">
+                  Saved while you try presets
+                </span>
+              </div>
+              <label className="color-control">
+                Interface accent
+                <input
+                  aria-label="Interface accent"
+                  type="color"
+                  value={preferences.accent}
+                  onChange={(e) => change({ accent: e.target.value })}
+                />
+              </label>
+              <details className="color-options">
+                <summary>Customize bar colors</summary>
+                {(['operating', 'savings'] as const).map((variant) => (
+                  <fieldset key={variant}>
+                    <legend>
+                      {variant === 'operating'
+                        ? 'Operating bars'
+                        : 'Savings & goal bars'}
+                    </legend>
+                    <div className="color-stops">
+                      {preferences[variant].map((color, i) => (
+                        <label className="color-control" key={i}>
+                          {['Start', 'Middle', 'End'][i]}
+                          <input
+                            type="color"
+                            aria-label={`${variant === 'operating' ? 'Operating' : 'Savings'} ${['start', 'middle', 'end'][i]} color`}
+                            value={color}
+                            onChange={(e) => {
+                              const colors = [
+                                ...preferences[variant],
+                              ] as ColorStops;
+                              colors[i] = e.target.value;
+                              change({ [variant]: colors, palette: 'custom' });
+                            }}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                ))}
+              </details>
+              <details className="color-options">
+                <summary>Customize chart colors</summary>
+                <div className="chart-colors">
+                  {EXPENSE_CATEGORIES.map((category, i) => (
+                    <label className="color-control" key={category}>
+                      {category}
                       <input
                         type="color"
-                        aria-label={`${variant === 'operating' ? 'Operating' : 'Savings'} ${['start', 'middle', 'end'][i]} color`}
-                        value={color}
+                        aria-label={`${category} chart color`}
+                        value={preferences.chartColors[i]}
                         onChange={(e) => {
-                          const colors = [
-                            ...preferences[variant],
-                          ] as ColorStops;
-                          colors[i] = e.target.value;
-                          change({ [variant]: colors, palette: 'custom' });
+                          const chartColors = [...preferences.chartColors];
+                          chartColors[i] = e.target.value;
+                          change({ chartColors, palette: 'custom' });
                         }}
                       />
                     </label>
                   ))}
                 </div>
-              </fieldset>
-            ))}
-          </details>
-          <details className="color-options">
-            <summary>Customize chart colors</summary>
-            <div className="chart-colors">
-              {EXPENSE_CATEGORIES.map((category, i) => (
-                <label className="color-control" key={category}>
-                  {category}
-                  <input
-                    type="color"
-                    aria-label={`${category} chart color`}
-                    value={preferences.chartColors[i]}
-                    onChange={(e) => {
-                      const chartColors = [...preferences.chartColors];
-                      chartColors[i] = e.target.value;
-                      change({ chartColors, palette: 'custom' });
-                    }}
-                  />
-                </label>
-              ))}
+              </details>
             </div>
-          </details>
+          )}
           <div className="appearance-preview" aria-label="Appearance preview">
             <div className="section-heading">
               <h3>Preview</h3>
@@ -241,8 +257,8 @@ export function AppearancePanel({
               ))}
             </div>
             <p className="muted">
-              Appearance examples, not spending data. Goal tracking and spending
-              reports will use these same bar styles.
+              Sample values only. Your funds, travel goals and reports use these
+              colors.
             </p>
           </div>
           {!saved && (
