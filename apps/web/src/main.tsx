@@ -1,3 +1,6 @@
+import { ActionMenu } from './ActionMenu';
+import { confirmAction, ConfirmationHost } from './Confirmation';
+import { Select } from './Select';
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
@@ -28,6 +31,13 @@ import { useAppearance } from './appearance';
 import { AppearancePanel } from './AppearancePanel';
 import { AppearanceContext } from './ProgressBar';
 import './style.css';
+import {
+  initializeNavigation,
+  useNavigation,
+  useBackLayer,
+  type AppView,
+  type Screen,
+} from './navigation';
 const HistoryPanel = lazy(() => import('./HistoryPanel'));
 import { NavIcon } from './NavIcon';
 import { Investments } from './Investments';
@@ -54,8 +64,6 @@ const monthName = (month: string) =>
     timeZone: 'UTC',
   }).format(new Date(`${month}-01T12:00:00Z`));
 type Commit = (doc: HouseholdPlan) => Promise<boolean>;
-type Page =
-  'overview' | 'plan' | 'charts' | 'investments' | 'travel' | 'settings';
 
 function MonthlyPlan({
   document,
@@ -98,6 +106,17 @@ function MonthlyPlan({
   const [expense, setExpense] = useState(emptyExpense);
   const [expenseTouched, setExpenseTouched] = useState(false);
   const [expenseError, setExpenseError] = useState('');
+  useBackLayer(
+    adding || editingId !== null,
+    () => {
+      setAdding(false);
+      setEditingId(null);
+      setExpense(emptyExpense());
+      setExpenseTouched(false);
+      setExpenseError('');
+    },
+    () => confirmAction('Discard this unfinished recurring expense?'),
+  );
   useEffect(() => {
     setDraft(document);
     setSavings(amountInput(savingsFor(document, month)));
@@ -201,9 +220,9 @@ function MonthlyPlan({
       setExpenseError((error as Error).message);
     }
   }
-  function archive(entry: RecurringExpense) {
+  async function archive(entry: RecurringExpense) {
     if (
-      window.confirm(
+      await confirmAction(
         `Archive ${entry.name} from ${monthName(month)}? Earlier months and transfer confirmations will remain in history.`,
       )
     )
@@ -234,47 +253,44 @@ function MonthlyPlan({
       </div>
       <div className="expense-actions">
         <strong>{money(entry.amountMinor)}</strong>
-        <details className="recurring-manage">
-          <summary>Manage</summary>
-          <div>
+        <ActionMenu label="Manage">
+          <button
+            className="text-button"
+            type="button"
+            disabled={disabled || adding || editingId !== null}
+            onClick={() => {
+              setExpenseError('');
+              setEditingId(entry.id);
+            }}
+          >
+            Edit
+          </button>
+          {!entry.archivedFromMonth && (
             <button
               className="text-button"
               type="button"
               disabled={disabled || adding || editingId !== null}
-              onClick={() => {
-                setExpenseError('');
-                setEditingId(entry.id);
-              }}
+              onClick={() => archive(entry)}
             >
-              Edit
+              Archive
             </button>
-            {!entry.archivedFromMonth && (
-              <button
-                className="text-button"
-                type="button"
-                disabled={disabled || adding || editingId !== null}
-                onClick={() => archive(entry)}
-              >
-                Archive
-              </button>
-            )}
-            <button
-              className="text-button destructive"
-              type="button"
-              disabled={disabled || adding || editingId !== null}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    `Delete ${entry.name} from all months, including its recurring planning history? Recorded expenses and confirmed transfers remain. Save monthly plan to apply the deletion.`,
-                  )
+          )}
+          <button
+            className="text-button destructive"
+            type="button"
+            disabled={disabled || adding || editingId !== null}
+            onClick={async () => {
+              if (
+                await confirmAction(
+                  `Delete ${entry.name} from all months, including its recurring planning history? Recorded expenses and confirmed transfers remain. Save monthly plan to apply the deletion.`,
                 )
-                  setDraft(deleteRecurringExpense(draft, entry.id));
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        </details>
+              )
+                setDraft(deleteRecurringExpense(draft, entry.id));
+            }}
+          >
+            Delete
+          </button>
+        </ActionMenu>
       </div>
     </article>
   );
@@ -365,7 +381,7 @@ function MonthlyPlan({
               </div>
               <label>
                 Category
-                <select
+                <Select
                   aria-label="Category"
                   value={expense.category}
                   onChange={(e) => {
@@ -385,7 +401,7 @@ function MonthlyPlan({
                     </option>
                   ))}
                   <option value="">Custom category…</option>
-                </select>
+                </Select>
               </label>
               {expense.category === '' && (
                 <label>
@@ -418,7 +434,7 @@ function MonthlyPlan({
               </label>
               <label>
                 Payment duration
-                <select
+                <Select
                   aria-label="Payment duration"
                   value={expense.duration}
                   onChange={(e) => {
@@ -428,7 +444,7 @@ function MonthlyPlan({
                 >
                   <option value="indefinite">Until archived</option>
                   <option value="limited">Until a specific date</option>
-                </select>
+                </Select>
               </label>
               {expense.duration === 'limited' && (
                 <label>
@@ -513,7 +529,7 @@ function MonthlyPlan({
           <h2>Funding rule</h2>
           <label>
             Contribution method
-            <select
+            <Select
               aria-label="Contribution method"
               value={ruleMode}
               onChange={(e) =>
@@ -522,7 +538,7 @@ function MonthlyPlan({
             >
               <option value="fixed">Recurring costs + fixed savings</option>
               <option value="income">Income percentages</option>
-            </select>
+            </Select>
           </label>
           {ruleMode === 'income' && (
             <>
@@ -701,7 +717,7 @@ function Overview({
     const status = fundingStatus(document, month, index, fund);
     if (status.confirmation) {
       if (
-        window.confirm(
+        await confirmAction(
           `Retract ${money(status.confirmation.amountMinor)} ${fund} confirmation for ${monthName(month)}?`,
         )
       )
@@ -717,7 +733,7 @@ function Overview({
     }
     if (status.notRequired) return;
     if (
-      window.confirm(
+      await confirmAction(
         `Confirm ${money(status.target)} transferred to ${fund} for ${monthName(month)}?`,
       )
     )
@@ -932,7 +948,7 @@ function Settings({
         <h2>I am</h2>
         <label>
           Your identity on this device
-          <select
+          <Select
             aria-label="Your identity"
             value={member}
             disabled={disabled}
@@ -944,7 +960,7 @@ function Settings({
                 {name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <p className="muted">
           Saved on this device. Choose your own name; v1 uses trust, without
@@ -968,16 +984,17 @@ function Settings({
               min="2000-01"
               max="2100-12"
               value={incomeMonth}
-              onChange={(e) => {
+              onChange={async (e) => {
+                const nextMonth = e.target.value;
                 if (
-                  e.target.value &&
+                  nextMonth &&
                   (JSON.stringify(incomes) ===
                     JSON.stringify(
                       incomesFor(document, incomeMonth).map(amountInput),
                     ) ||
-                    window.confirm('Discard unsaved income changes?'))
+                    (await confirmAction('Discard unsaved income changes?')))
                 )
-                  setIncomeMonth(e.target.value);
+                  setIncomeMonth(nextMonth);
               }}
             />
           </label>
@@ -1079,12 +1096,6 @@ function App() {
   }
   const [document, setDocument] = useState<HouseholdPlan | null>(null);
   const [month, setMonth] = useState(today.slice(0, 7));
-  const [view, setView] = useState<Page>('overview');
-  const [expenseTrip, setExpenseTrip] = useState<{
-    label: string;
-    start: string | null;
-    end: string | null;
-  } | null>(null);
   const [busy, setBusy] = useState(true),
     [syncBusy, setSyncBusy] = useState(false),
     [dirty, setDirty] = useState(false);
@@ -1092,6 +1103,15 @@ function App() {
     [notice, setNotice] = useState(''),
     [syncStatus, setSyncStatus] = useState('Saved on this device only.');
   const [refreshKey, setRefreshKey] = useState(0);
+  const { screen, navigate } = useNavigation(
+    async () => !dirty || (await confirmAction('Discard unsaved changes?')),
+    dirty,
+  );
+  const { view, trip: expenseTrip } = screen;
+  useEffect(() => {
+    setError('');
+    setNotice('');
+  }, [view]);
   useEffect(() => {
     let cancelled = false;
     void (
@@ -1148,13 +1168,8 @@ function App() {
       setBusy(false);
     }
   }
-  function changeView(next: Page) {
-    if (
-      next !== view &&
-      (!dirty || window.confirm('Discard unsaved changes?'))
-    ) {
-      setView(next);
-      window.scrollTo({ top: 0, behavior: 'instant' });
+  async function changeView(next: AppView, trip: Screen['trip'] = null) {
+    if (await navigate(next, trip)) {
       setDirty(false);
       setError('');
       setNotice('');
@@ -1219,10 +1234,7 @@ function App() {
                     }
                     aria-current={view === page ? 'page' : undefined}
                     disabled={busy}
-                    onClick={() => {
-                      setExpenseTrip(null);
-                      changeView(page);
-                    }}
+                    onClick={() => void changeView(page)}
                   >
                     <NavIcon name={page} />
                     <span>
@@ -1291,15 +1303,16 @@ function App() {
                   max="2100-12"
                   value={month}
                   disabled={busy || syncBusy}
-                  onChange={(e) => {
+                  onChange={async (e) => {
+                    const nextMonth = e.target.value;
                     if (
                       e.target.value &&
                       (!dirty ||
-                        window.confirm(
+                        (await confirmAction(
                           'Discard unsaved changes and switch months?',
-                        ))
+                        )))
                     ) {
-                      setMonth(e.target.value);
+                      setMonth(nextMonth);
                       setDirty(false);
                       setNotice('');
                       setError('');
@@ -1319,10 +1332,10 @@ function App() {
             <div className="message error" role="alert">
               {error}{' '}
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (
                     !dirty ||
-                    window.confirm('Discard unsaved changes and reload?')
+                    (await confirmAction('Discard unsaved changes and reload?'))
                   )
                     window.location.reload();
                 }}
@@ -1385,12 +1398,11 @@ function App() {
                   commit={commit}
                   onDirty={setDirty}
                   showExpenses={(trip) => {
-                    setExpenseTrip({
+                    void changeView('overview', {
                       label: trip.label,
                       start: trip.startDate,
                       end: trip.endDate,
                     });
-                    changeView('overview');
                   }}
                 />
               )}
@@ -1458,9 +1470,11 @@ function App() {
     </AppearanceContext.Provider>
   );
 }
+initializeNavigation();
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
+    <ConfirmationHost />
   </React.StrictMode>,
 );
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

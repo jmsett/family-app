@@ -1,3 +1,6 @@
+import { confirmAction } from './Confirmation';
+import { Select } from './Select';
+import { useBackLayer } from './navigation';
 import { useState } from 'react';
 import { appendEntries, parseMoney, validateLedger } from '@family/domain';
 import type { Fund, FundMovement, HouseholdPlan } from '@family/shared';
@@ -28,6 +31,11 @@ export function FundActivity({
     [date, setDate] = useState(today),
     [error, setError] = useState('');
   const [id, setId] = useState(() => crypto.randomUUID());
+  useBackLayer(
+    open,
+    () => setOpen(false),
+    () => confirmAction('Discard this unfinished fund movement?'),
+  );
   let candidate: FundMovement | null = null,
     validation = '';
   try {
@@ -75,9 +83,9 @@ export function FundActivity({
             if (!candidate || !member) return;
             setError('');
             if (
-              !window.confirm(
+              !(await confirmAction(
                 `Record ${formatMoney(candidate.amountMinor)} from ${from} to ${to === 'external' ? 'outside tracked funds' : to}?`,
-              )
+              ))
             )
               return;
             try {
@@ -98,18 +106,18 @@ export function FundActivity({
             <div className="input-row">
               <label>
                 From
-                <select
+                <Select
                   aria-label="Move from fund"
                   value={from}
                   onChange={(e) => setFrom(e.target.value as Fund)}
                 >
                   <option value="operating">Operating</option>
                   <option value="savings">Savings</option>
-                </select>
+                </Select>
               </label>
               <label>
                 To
-                <select
+                <Select
                   aria-label="Move to fund"
                   value={to}
                   onChange={(e) => setTo(e.target.value as Fund | 'external')}
@@ -117,7 +125,7 @@ export function FundActivity({
                   <option value="operating">Operating</option>
                   <option value="savings">Savings</option>
                   <option value="external">Outside tracked funds</option>
-                </select>
+                </Select>
               </label>
             </div>
             <label>

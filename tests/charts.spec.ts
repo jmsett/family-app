@@ -1,3 +1,4 @@
+import { handleNextDialog } from './helpers';
 import { test, expect, type Page } from '@playwright/test';
 import {
   initialHousehold,
@@ -208,7 +209,7 @@ test('overview uses a single member balance, compact due captions, separate pane
   }
   const value = await page.getByTestId('operating-funds').boundingBox();
   expect(value!.height).toBeGreaterThanOrEqual(48);
-  page.once('dialog', (d) => {
+  const handledDialog1 = handleNextDialog(page, (d) => {
     expect(d.message()).toMatch(
       /^Confirm €50.00 transferred to operating for /,
     );
@@ -218,6 +219,7 @@ test('overview uses a single member balance, compact due captions, separate pane
   await page
     .getByRole('button', { name: 'Confirm my operating transfer', exact: true })
     .click();
+  await handledDialog1;
   await expect(
     page.getByRole('button', {
       name: 'Confirm my operating transfer',

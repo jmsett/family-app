@@ -1,3 +1,4 @@
+import { Select } from './Select';
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ColorType,
@@ -344,7 +345,7 @@ export default function HistoryPanel({
       <div className="chart-toolbar">
         <label className="chart-series">
           <span className="sr-only">Chart series</span>
-          <select
+          <Select
             aria-label="Chart series"
             value={metric}
             onChange={(e) => {
@@ -358,7 +359,7 @@ export default function HistoryPanel({
                 {label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <div className="chart-style" role="group" aria-label="Chart style">
           <button
@@ -619,7 +620,7 @@ export default function HistoryPanel({
           {metric === 'expenses' && (
             <label>
               Category
-              <select
+              <Select
                 aria-label="Chart category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
@@ -628,7 +629,7 @@ export default function HistoryPanel({
                 {categories.map((c) => (
                   <option key={c}>{c}</option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
           <label className="chart-grid-option">

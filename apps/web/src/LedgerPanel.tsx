@@ -1,3 +1,6 @@
+import { confirmAction } from './Confirmation';
+import { Select } from './Select';
+import { useBackLayer } from './navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   appendEntries,
@@ -254,7 +257,7 @@ function ExpenseEditor({
           >
             <label>
               Who paid
-              <select
+              <Select
                 aria-label="Quick paid by"
                 value={quickPayer}
                 onChange={(e) => applyQuick(e.target.value as Party, quickKind)}
@@ -264,11 +267,11 @@ function ExpenseEditor({
                     {partyName(document, p)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label>
               Expense type
-              <select
+              <Select
                 aria-label="Quick expense type"
                 value={quickKind}
                 onChange={(e) =>
@@ -285,7 +288,7 @@ function ExpenseEditor({
                   Owed full amount
                 </option>
                 <option value="household">Paid for household</option>
-              </select>
+              </Select>
             </label>
             {quickPayer === 'household' && (
               <small>
@@ -317,7 +320,7 @@ function ExpenseEditor({
         </label>
         <label>
           Category
-          <select
+          <Select
             aria-label="Actual expense category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -328,7 +331,7 @@ function ExpenseEditor({
               </option>
             ))}
             <option value="">Custom category…</option>
-          </select>
+          </Select>
         </label>
         {!category && (
           <label>
@@ -351,7 +354,7 @@ function ExpenseEditor({
           />
         </label>
         {document.trips.length > 0 && (
-          <select
+          <Select
             aria-label="Add trip label"
             value=""
             onChange={(e) => {
@@ -373,7 +376,7 @@ function ExpenseEditor({
                 {t.archived ? ' (archived)' : ''}
               </option>
             ))}
-          </select>
+          </Select>
         )}
         {entryMode === 'custom' && (
           <section
@@ -396,7 +399,7 @@ function ExpenseEditor({
               <div className="input-row">
                 <label>
                   Paid by
-                  <select
+                  <Select
                     aria-label="Expense payer"
                     value={payer}
                     onChange={(e) => {
@@ -412,11 +415,11 @@ function ExpenseEditor({
                         {partyName(document, p)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   Funding source
-                  <select
+                  <Select
                     aria-label="Expense funding source"
                     value={source}
                     disabled={payer === 'household'}
@@ -426,20 +429,20 @@ function ExpenseEditor({
                   >
                     <option value="personal">Personal funds</option>
                     <option value="household">Household funds</option>
-                  </select>
+                  </Select>
                 </label>
               </div>
               {source === 'household' && (
                 <label>
                   Pay from
-                  <select
+                  <Select
                     aria-label="Expense fund"
                     value={fund}
                     onChange={(e) => setFund(e.target.value as Fund)}
                   >
                     <option value="operating">Operating funds</option>
                     <option value="savings">Savings funds</option>
-                  </select>
+                  </Select>
                 </label>
               )}
               <p className="muted">
@@ -448,7 +451,7 @@ function ExpenseEditor({
               </p>
               <label>
                 Split method
-                <select
+                <Select
                   aria-label="Split method"
                   value={mode}
                   onChange={(e) => changeMode(e.target.value as SplitMode)}
@@ -456,7 +459,7 @@ function ExpenseEditor({
                   <option value="equal">Equally</option>
                   <option value="amount">Unequally by amount</option>
                   <option value="percentage">By percentage</option>
-                </select>
+                </Select>
               </label>
               <div className="split-rows" aria-label="Expense beneficiaries">
                 {PARTIES.map((party, i) => (
@@ -589,9 +592,9 @@ function SettlementEditor({
     if (!candidate) return;
     setError('');
     if (
-      !window.confirm(
+      !(await confirmAction(
         `Record that ${partyName(document, from)} paid ${money(candidate.amountMinor)} to ${partyName(document, to)}?`,
-      )
+      ))
     )
       return;
     try {
@@ -615,7 +618,7 @@ function SettlementEditor({
         <div className="input-row">
           <label>
             From
-            <select
+            <Select
               aria-label="Settlement from"
               value={from}
               onChange={(e) => setFrom(e.target.value as Party)}
@@ -625,11 +628,11 @@ function SettlementEditor({
                   {partyName(document, p)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <label>
             To
-            <select
+            <Select
               aria-label="Settlement to"
               value={to}
               onChange={(e) => setTo(e.target.value as Party)}
@@ -639,7 +642,7 @@ function SettlementEditor({
                   {partyName(document, p)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         </div>
         <p className="muted">Outstanding: {money(limit)}</p>
@@ -681,14 +684,14 @@ function SettlementEditor({
             <summary>Advanced options</summary>
             <label>
               Household account
-              <select
+              <Select
                 aria-label="Settlement household fund"
                 value={fund}
                 onChange={(e) => setFund(e.target.value as Fund)}
               >
                 <option value="operating">Operating</option>
                 <option value="savings">Savings</option>
-              </select>
+              </Select>
             </label>
           </details>
         )}
@@ -932,6 +935,11 @@ export function LedgerPanel({
         ? categorySpending(chartDoc, fromDate, toDate, spendingScope)
         : [],
     total = spending.reduce((sum, e) => sum + e.amountMinor, 0);
+  useBackLayer(
+    editor !== null,
+    () => setEditor(null),
+    () => confirmAction('Discard this unfinished entry?'),
+  );
   function edit(value: Editor) {
     if (member) {
       if (value.type === 'settlement') setSettleOpen(true);
@@ -1122,7 +1130,7 @@ export function LedgerPanel({
               <div className="input-row">
                 <label>
                   Person / household
-                  <select
+                  <Select
                     aria-label="History party"
                     value={filterParty}
                     onChange={(e) => setFilterParty(e.target.value)}
@@ -1133,11 +1141,11 @@ export function LedgerPanel({
                         {partyName(document, p)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
                 <label>
                   Category
-                  <select
+                  <Select
                     aria-label="History category"
                     value={filterCategory}
                     onChange={(e) => setFilterCategory(e.target.value)}
@@ -1148,12 +1156,12 @@ export function LedgerPanel({
                         {c}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </label>
               </div>
               <label>
                 Label / trip
-                <select
+                <Select
                   aria-label="History label"
                   value={filterLabel}
                   onChange={(e) => setFilterLabel(e.target.value)}
@@ -1165,7 +1173,7 @@ export function LedgerPanel({
                         label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
               <p className="muted">
                 Dates, category and labels also filter spending. Person /
@@ -1333,7 +1341,7 @@ export function LedgerPanel({
           <summary>Spending by category</summary>
           <label className="spending-scope">
             Spending for
-            <select
+            <Select
               aria-label="Spending scope"
               value={spendingScope}
               onChange={(e) =>
@@ -1347,7 +1355,7 @@ export function LedgerPanel({
                   {partyName(document, p)}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <small className="muted">
             By who bears the cost, regardless of who paid. Date, category and

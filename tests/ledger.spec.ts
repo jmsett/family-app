@@ -1,3 +1,4 @@
+import { handleNextDialog } from './helpers';
 import { expect, test, type Page } from '@playwright/test';
 import { confirm, navigate } from './helpers';
 async function identity(page: Page) {
@@ -58,10 +59,11 @@ test('expenses, partial repayments and corrections retain history and carry debt
     .getByRole('button', { name: 'Record a payment', exact: true })
     .click();
   await page.getByLabel('Settlement amount').fill('15');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog1 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record payment', exact: true })
     .click();
+  await handledDialog1;
   await expect(page.getByTestId('balance-a')).toHaveText('+€25.00');
   await page.getByText('Spending by category', { exact: true }).click();
   await expect(page.getByTestId('actual-spending-total')).toHaveText('€80.00');
@@ -133,10 +135,11 @@ test('household advances reserve funds and household spending creates no duplica
   await page
     .getByRole('button', { name: 'Record a payment', exact: true })
     .click();
-  page.once('dialog', (d) => d.accept());
+  const handledDialog2 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record payment', exact: true })
     .click();
+  await handledDialog2;
   await expect(page.getByTestId('balance-household')).toHaveText('€0.00');
   await expect(page.getByTestId('operating-funds')).toHaveText('-€80.00');
   await purchase(page, 'Household bill', '20', 'household');
@@ -263,6 +266,7 @@ test('schema2 upgrades preserve recorded funds, member identity and recurring pl
   await navigate(page, 'Overview');
   await purchase(page, 'After upgrade', '20');
   await page.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
   await page.reload();
   await page.getByLabel('Planning month').fill('2026-11');
   await expect(page.getByTestId('balance-b')).toHaveText('+€10.00');
@@ -367,10 +371,11 @@ test('funds confirm independently, zero shares need no transfer, and savings mov
     'text-align',
     'center',
   );
-  page.once('dialog', (d) => d.accept());
+  const handledDialog3 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Confirm my operating transfer', exact: true })
     .click();
+  await handledDialog3;
   await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
   await expect(page.getByTestId('savings-funds')).toHaveText('€0.00');
   await expect(
@@ -379,10 +384,11 @@ test('funds confirm independently, zero shares need no transfer, and savings mov
       exact: true,
     }),
   ).toBeVisible();
-  page.once('dialog', (d) => d.accept());
+  const handledDialog4 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Confirm my savings transfer', exact: true })
     .click();
+  await handledDialog4;
   await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
   await page.getByText('Fund activity', { exact: true }).click();
   await page
@@ -392,10 +398,11 @@ test('funds confirm independently, zero shares need no transfer, and savings mov
   await page
     .getByLabel('Fund movement description')
     .fill('Cover operating costs');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog5 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record movement', exact: true })
     .click();
+  await handledDialog5;
   await expect(page.getByTestId('operating-funds')).toHaveText('€70.00');
   await expect(page.getByTestId('savings-funds')).toHaveText('€80.00');
   await page
@@ -406,10 +413,11 @@ test('funds confirm independently, zero shares need no transfer, and savings mov
   await page
     .getByLabel('Fund movement description')
     .fill('Withdraw from tracked savings');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog6 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record movement', exact: true })
     .click();
+  await handledDialog6;
   await expect(page.getByTestId('savings-funds')).toHaveText('€75.00');
   await purchase(page, 'Paid from savings', '10', 'household');
   await page
@@ -472,14 +480,16 @@ test('confirmed funding toggles back to pending, preserves the other fund and ca
   });
   await expect(retract).toBeEnabled();
   await expect(retract).toHaveAttribute('aria-pressed', 'true');
-  page.once('dialog', (d) => d.dismiss());
+  const handledDialog7 = handleNextDialog(page, (d) => d.dismiss());
   await retract.click();
+  await handledDialog7;
   await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
-  page.once('dialog', (d) => {
+  const handledDialog8 = handleNextDialog(page, (d) => {
     expect(d.message()).toContain('Retract €50.00 operating confirmation');
     void d.accept();
   });
   await retract.click();
+  await handledDialog8;
   await expect(page.getByTestId('operating-funds')).toHaveText('€0.00');
   await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
   await expect(
@@ -500,20 +510,22 @@ test('confirmed funding toggles back to pending, preserves the other fund and ca
   await expect(page.getByTestId('chart-target')).toHaveText('€100.00');
   await page.reload();
   await expect(page.getByTestId('operating-funds')).toHaveText('€0.00');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog9 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Confirm my operating transfer', exact: true })
     .click();
+  await handledDialog9;
   await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
   await page.getByText('Fund activity', { exact: true }).click();
   await expect(page.locator('.retracted-contribution')).toHaveCount(1);
-  page.once('dialog', (d) => d.accept());
+  const handledDialog10 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', {
       name: 'Retract my savings confirmation',
       exact: true,
     })
     .click();
+  await handledDialog10;
   await expect(page.getByTestId('savings-funds')).toHaveText('€0.00');
   await expect(page.getByTestId('operating-funds')).toHaveText('€50.00');
   await navigate(page, 'Settings');

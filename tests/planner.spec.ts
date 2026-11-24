@@ -1,3 +1,4 @@
+import { handleNextDialog } from './helpers';
 import { expect, test } from '@playwright/test';
 import { confirm, navigate } from './helpers';
 
@@ -351,14 +352,17 @@ test('recurring edits apply forward or across all months and deleting removes pl
   }
   row = page.locator('.expense-row').filter({ hasText: 'Rent' });
   await row.getByText('Manage', { exact: true }).click();
-  page.once('dialog', (d) => d.dismiss());
+  const handledDialog1 = handleNextDialog(page, (d) => d.dismiss());
   await row.getByRole('button', { name: 'Delete', exact: true }).click();
+  await handledDialog1;
   await expect(page.getByTestId('operating-target')).toHaveText('€90.00');
-  page.once('dialog', (d) => {
+  await row.getByText('Manage', { exact: true }).click();
+  const handledDialog2 = handleNextDialog(page, (d) => {
     expect(d.message()).toContain('from all months');
     void d.accept();
   });
   await row.getByRole('button', { name: 'Delete', exact: true }).click();
+  await handledDialog2;
   await expect(page.getByTestId('operating-target')).toHaveText('€0.00');
   await page
     .getByRole('button', { name: 'Save monthly plan', exact: true })
@@ -399,8 +403,9 @@ test('archived recurring expenses can be corrected or deleted, and an unfinished
   await page.getByLabel('Planning month').fill('2030-02');
   let row = page.locator('.expense-row').filter({ hasText: 'Subscription' });
   await row.getByText('Manage', { exact: true }).click();
-  page.once('dialog', (d) => d.accept());
+  const handledDialog3 = handleNextDialog(page, (d) => d.accept());
   await row.getByRole('button', { name: 'Archive', exact: true }).click();
+  await handledDialog3;
   await page
     .getByRole('button', { name: 'Save monthly plan', exact: true })
     .click();
@@ -418,8 +423,9 @@ test('archived recurring expenses can be corrected or deleted, and an unfinished
   await expect(
     page.getByRole('button', { name: 'Save monthly plan', exact: true }),
   ).toBeDisabled();
-  page.once('dialog', (d) => d.dismiss());
+  const handledDialog4 = handleNextDialog(page, (d) => d.dismiss());
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await handledDialog4;
   await expect(
     page.getByRole('form', { name: 'Edit recurring expense', exact: true }),
   ).toBeVisible();
@@ -448,8 +454,9 @@ test('archived recurring expenses can be corrected or deleted, and an unfinished
   await page.locator('.schedule-history > summary').click();
   row = page.locator('.expense-row').filter({ hasText: 'Subscription' });
   await row.getByText('Manage', { exact: true }).click();
-  page.once('dialog', (d) => d.accept());
+  const handledDialog5 = handleNextDialog(page, (d) => d.accept());
   await row.getByRole('button', { name: 'Delete', exact: true }).click();
+  await handledDialog5;
   await page
     .getByRole('button', { name: 'Save monthly plan', exact: true })
     .click();

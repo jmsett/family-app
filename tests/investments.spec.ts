@@ -1,3 +1,4 @@
+import { handleNextDialog } from './helpers';
 import { expect, test } from '@playwright/test';
 import { navigate } from './helpers';
 
@@ -54,10 +55,11 @@ test('income, fair percentage funding and affordability work together without cr
   await page.getByRole('button', { name: 'Save monthly plan' }).click();
   await navigate(page, 'Overview');
   await expect(page.getByTestId('operating-funds')).toHaveText('€0.00');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog1 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Confirm my savings transfer', exact: true })
     .click();
+  await handledDialog1;
   await expect(page.getByTestId('savings-funds')).toHaveText('€400.00');
   await page.reload();
   await page.getByLabel('Planning month').fill('2026-02');

@@ -1,3 +1,4 @@
+import { confirmAction } from './Confirmation';
 import { useEffect, useRef, useState } from 'react';
 import { GitHubHousehold, reconcile, sameHousehold } from './household-sync';
 import { readRecord, writeRecord } from './storage';
@@ -252,9 +253,9 @@ export function SyncPanel({
               </button>
               <button
                 disabled={working || dirty}
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    window.confirm(
+                    await confirmAction(
                       'Replace unsynced plan settings with GitHub? Transfer confirmations will be preserved. Export your device copy first if needed.',
                     )
                   )

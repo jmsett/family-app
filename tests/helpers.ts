@@ -1,4 +1,23 @@
 import { expect, type Page } from '@playwright/test';
+export async function handleNextDialog(
+  page: Page,
+  handle: (dialog: {
+    message: () => string;
+    accept: () => Promise<void>;
+    dismiss: () => Promise<void>;
+  }) => unknown,
+) {
+  const dialog = page.locator('.confirmation-dialog');
+  await expect(dialog).toBeVisible();
+  const message = await dialog.locator('.dialog-message').innerText();
+  await handle({
+    message: () => message,
+    accept: () => dialog.getByTestId('confirm-action').click(),
+    dismiss: () =>
+      dialog.getByRole('button', { name: 'Cancel', exact: true }).click(),
+  });
+  await expect(dialog).toBeHidden();
+}
 export async function navigate(
   page: Page,
   name:
@@ -50,8 +69,9 @@ export async function confirm(page: Page, member: '0' | '1') {
       exact: true,
     });
     if (await button.count()) {
-      page.once('dialog', (d) => d.accept());
+      const handledDialog1 = handleNextDialog(page, (d) => d.accept());
       await button.click();
+      await handledDialog1;
       await expect(button).toHaveCount(0);
     }
   }

@@ -1,3 +1,4 @@
+import { handleNextDialog } from './helpers';
 import { expect, test } from '@playwright/test';
 import { confirm, navigate, setSavings } from './helpers';
 test('joint trip goals budget dates, earmark savings once, retain photos and labels, filter expenses and archive', async ({
@@ -127,10 +128,11 @@ test('joint trip goals budget dates, earmark savings once, retain photos and lab
     fullPage: true,
   });
   await renamed.getByText('Budget & details', { exact: true }).click();
-  page.once('dialog', (d) => d.accept());
+  const handledDialog1 = handleNextDialog(page, (d) => d.accept());
   await renamed
     .getByRole('button', { name: 'Archive trip', exact: true })
     .click();
+  await handledDialog1;
   await expect(renamed).toHaveCount(0);
   await expect(page.getByText(/€0.00 earmarked/)).toBeVisible();
   await page.getByText('Archived trips (1)', { exact: true }).click();
@@ -170,8 +172,9 @@ test('undated goals use estimated days, block double allocation, protect drafts 
   await page.getByLabel('Trip return', { exact: true }).fill('2027-03-10');
   await page.getByRole('button', { name: 'Save trip', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Return cannot precede');
-  page.once('dialog', (d) => d.dismiss());
+  const handledDialog2 = handleNextDialog(page, (d) => d.dismiss());
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await handledDialog2;
   await expect(
     page.getByRole('form', { name: 'New trip', exact: true }),
   ).toBeVisible();

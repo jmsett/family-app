@@ -1,3 +1,6 @@
+import { confirmAction } from './Confirmation';
+import { Select } from './Select';
+import { useBackLayer } from './navigation';
 import { useEffect, useState } from 'react';
 import {
   allocateTrip,
@@ -224,7 +227,7 @@ function TripEditor({
         <div className="input-row">
           <label>
             Contingency
-            <select
+            <Select
               aria-label="Trip extras method"
               value={extrasMode}
               onChange={(e) =>
@@ -233,7 +236,7 @@ function TripEditor({
             >
               <option value="percentage">Percentage estimate</option>
               <option value="fixed">Custom amount</option>
-            </select>
+            </Select>
           </label>
           {extrasMode === 'percentage'
             ? amountField('Extra allowance (%)', extraPercent, setExtraPercent)
@@ -426,6 +429,14 @@ export function Travel({
     [allocation, setAllocation] = useState<string | null>(null);
   const savings = tripSavings(document, today.slice(0, 7));
   const editing = editor !== null || allocation !== null;
+  useBackLayer(
+    editing,
+    () => {
+      setEditor(null);
+      setAllocation(null);
+    },
+    () => confirmAction('Discard this unfinished trip edit?'),
+  );
   useEffect(() => onDirty(editing), [editing, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
   const active = document.trips.filter((t) => !t.archived),
@@ -624,9 +635,9 @@ export function Travel({
               <button
                 className="text-button"
                 disabled={disabled || editing}
-                onClick={() => {
+                onClick={async () => {
                   if (
-                    window.confirm(
+                    await confirmAction(
                       `Archive ${trip.name} and release ${money(trip.allocatedMinor)} earmarked savings?`,
                     )
                   )

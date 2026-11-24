@@ -1,3 +1,4 @@
+import { Select } from './Select';
 import { useState } from 'react';
 import {
   editRecurringExpense,
@@ -91,7 +92,7 @@ export function RecurringExpenseEditor({
         <h3>Edit recurring expense</h3>
         <label>
           Apply changes
-          <select
+          <Select
             aria-label="Recurring edit scope"
             value={scope}
             onChange={(e) => setScope(e.target.value as 'forward' | 'all')}
@@ -100,7 +101,7 @@ export function RecurringExpenseEditor({
               From {monthName(month)} onward
             </option>
             <option value="all">All months from {monthName(firstMonth)}</option>
-          </select>
+          </Select>
         </label>
         <small>
           {scope === 'forward'
@@ -150,7 +151,7 @@ export function RecurringExpenseEditor({
         </small>
         <label>
           Category
-          <select
+          <Select
             aria-label="Category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -161,7 +162,7 @@ export function RecurringExpenseEditor({
               </option>
             ))}
             <option value="">Custom category…</option>
-          </select>
+          </Select>
         </label>
         {!category && (
           <label>
@@ -185,14 +186,14 @@ export function RecurringExpenseEditor({
         </label>
         <label>
           Payment duration
-          <select
+          <Select
             aria-label="Payment duration"
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
           >
             <option value="indefinite">Until archived</option>
             <option value="limited">Until a specific date</option>
-          </select>
+          </Select>
         </label>
         {duration === 'limited' && (
           <label>

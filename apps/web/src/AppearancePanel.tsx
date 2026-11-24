@@ -1,3 +1,4 @@
+import { Select } from './Select';
 import { useState } from 'react';
 import { EXPENSE_CATEGORIES } from '@family/domain';
 import {
@@ -79,7 +80,7 @@ export function AppearancePanel({
           <div className="input-row">
             <label>
               Theme
-              <select
+              <Select
                 aria-label="Theme"
                 value={preferences.theme}
                 onChange={(e) =>
@@ -89,11 +90,11 @@ export function AppearancePanel({
                 <option value="dark">Dark</option>
                 <option value="light">Light</option>
                 <option value="system">Use device setting</option>
-              </select>
+              </Select>
             </label>
             <label>
               Bar effect
-              <select
+              <Select
                 aria-label="Bar effect"
                 value={preferences.effect}
                 onChange={(e) =>
@@ -105,7 +106,7 @@ export function AppearancePanel({
                     {effect.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           </div>
           <div className="appearance-ranges">

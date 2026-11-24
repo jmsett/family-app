@@ -1,3 +1,4 @@
+import { handleNextDialog } from './helpers';
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { confirm, connect, navigate, setSavings } from './helpers';
@@ -56,6 +57,21 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   );
   expect(offlineId).toBe('/family-app/');
   await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
+  await navigate(page, 'Settings');
+  await page.getByLabel('Your identity').click();
+  await expect(
+    page.getByRole('dialog', { name: 'Your identity', exact: true }),
+  ).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { name: 'Settings', exact: true }),
+  ).toBeVisible();
+  await page.goBack();
+  await expect(
+    page.getByRole('heading', { name: 'Overview', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByTestId('savings-funds')).toHaveText('€100.00');
   await confirm(page, '1');
   await expect(page.getByTestId('savings-funds')).toHaveText('€200.00');
   await page.reload();
@@ -88,10 +104,11 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await page
     .getByLabel('Fund movement description')
     .fill('Offline savings transfer');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog1 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record movement', exact: true })
     .click();
+  await handledDialog1;
   await expect(page.getByTestId('savings-funds')).toHaveText('€180.00');
   await expect(page.getByTestId('operating-funds')).toHaveText('€20.00');
   await page.reload();
@@ -108,13 +125,14 @@ test('branch-published PWA keeps plans and confirmed funds offline', async ({
   await page.getByLabel('Chart series').selectOption('operating');
   await expect(page.getByTestId('chart-value')).toHaveText('€20.00');
   await navigate(page, 'Overview');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog2 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', {
       name: 'Retract my savings confirmation',
       exact: true,
     })
     .click();
+  await handledDialog2;
   await expect(page.getByTestId('savings-funds')).toHaveText('€80.00');
   await page.reload();
   await expect(page.getByTestId('savings-funds')).toHaveText('€80.00');
@@ -315,8 +333,9 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   expect(await readFile((await backup.path())!, 'utf8')).not.toContain(
     'github_pat_fake_test_only',
   );
-  second.once('dialog', (dialog) => dialog.accept());
+  const handledDialog3 = handleNextDialog(second, (dialog) => dialog.accept());
   await second.getByRole('button', { name: 'Recover from GitHub' }).click();
+  await handledDialog3;
   await expect(status(second)).toContainText('Synced with');
   await navigate(second, 'Monthly plan');
   await expect(
@@ -403,10 +422,11 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await page
     .getByRole('button', { name: 'Record a payment', exact: true })
     .click();
-  page.once('dialog', (d) => d.accept());
+  const handledDialog4 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record payment', exact: true })
     .click();
+  await handledDialog4;
   await expect(page.getByTestId('balance-a')).toHaveText('€0.00');
   await context.setOffline(false);
   await navigate(page, 'Settings');
@@ -428,10 +448,11 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await page
     .getByLabel('Fund movement description')
     .fill('Offline fund movement');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog5 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Record movement', exact: true })
     .click();
+  await handledDialog5;
   await expect(page.getByTestId('savings-funds')).toHaveText('€230.00');
   await context.setOffline(false);
   await navigate(page, 'Settings');
@@ -448,13 +469,14 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await navigate(page, 'Overview');
   await context.setOffline(true);
   await secondContext.setOffline(true);
-  page.once('dialog', (d) => d.accept());
+  const handledDialog6 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', {
       name: 'Retract my savings confirmation',
       exact: true,
     })
     .click();
+  await handledDialog6;
   await expect(page.getByTestId('savings-funds')).toHaveText('€105.00');
   await second
     .getByRole('button', { name: 'Add expense', exact: true })
@@ -477,10 +499,11 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await page.getByRole('button', { name: 'Sync now' }).click();
   await expect(status(page)).toContainText('Synced with');
   await navigate(page, 'Overview');
-  page.once('dialog', (d) => d.accept());
+  const handledDialog7 = handleNextDialog(page, (d) => d.accept());
   await page
     .getByRole('button', { name: 'Confirm my savings transfer', exact: true })
     .click();
+  await handledDialog7;
   await navigate(page, 'Settings');
   await page.getByRole('button', { name: 'Sync now' }).click();
   await expect(status(page)).toContainText('Synced with');
@@ -597,8 +620,9 @@ test('devices synchronize plans, recover conflicts and merge independent offline
   await context.setOffline(true);
   await navigate(page, 'Monthly plan');
   await recurring.getByText('Manage', { exact: true }).click();
-  page.once('dialog', (d) => d.accept());
+  const handledDialog8 = handleNextDialog(page, (d) => d.accept());
   await recurring.getByRole('button', { name: 'Delete', exact: true }).click();
+  await handledDialog8;
   await page
     .getByRole('button', { name: 'Save monthly plan', exact: true })
     .click();
